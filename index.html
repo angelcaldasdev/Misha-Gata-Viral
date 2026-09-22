@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Misha la gata viral</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <nav class="nav-principal">
+        <a href="#inicio">Inicio</a>
+        <a href="#galeria">Galería</a>
+        <a href="#donaciones">Donaciones</a>
+        <a href="#suscripcion">Suscríbete</a>
+        <a href="#instagram">Instagram</a>
+    </nav>
+
+    <!-- BACKGROUNDS -->
+    <header class="hero" id="inicio">
+        <div class="hero-patch"></div>
+        <div class="caja hero-photo"></div>
+        <h1>Misha la gata viral</h1>
+        <p class="hero-subtitulo">Calicó, dormilona y estrella de la casa 🐾</p>
+    </header>
+
+    <section class="datos">
+        <h2>Datos de Misha</h2>
+        <ul class="datos-lista">
+            <li>😴 Dormir mucho, en especial durante el día.</li>
+            <li>🔌 Jugar con cables (su travesura favorita).</li>
+            <li>🥰 Ser muy linda y tierna con toda la familia.</li>
+            <li>🕵️‍♀️ Introvertida y sigilosa.</li>
+            <li>🐟 Amante del churu.</li>
+            <li>🎂 Tiene 1 año recién cumplido de edad.</li>
+        </ul>
+    </section>
+
+    <!-- COLORES -->
+    <section class="galeria" id="galeria">
+        <h2>Sus momentos favoritos</h2>
+        <p class="galeria-ayuda">Desliza con las flechas (o con el dedo) para ver más fotos de Misha.</p>
+
+        <div class="carrusel">
+            <button class="carrusel-flecha carrusel-flecha--izq" id="flechaIzq" aria-label="Foto anterior">&#10094;</button>
+
+            <div class="carrusel-viewport">
+                <div class="carrusel-track" id="carruselTrack">
+                    <!-- Los slides se generan automáticamente desde funciones.js (arreglo fotosMisha) -->
+                </div>
+            </div>
+
+            <button class="carrusel-flecha carrusel-flecha--der" id="flechaDer" aria-label="Foto siguiente">&#10095;</button>
+        </div>
+
+        <div class="carrusel-indicadores" id="carruselIndicadores"></div>
+    </section>
+
+    <!-- DISEÑO RESPONSIVO WEB -->
+    <!-- MOBILE FIRST -->
+    <!-- DESKTOP FIRST -->
+
+    <section class="suscripcion" id="suscripcion">
+        <div class="suscripcion-caja">
+            <h2>No te pierdas nada de Misha</h2>
+            <p>Déjanos tu correo y te avisamos cuando publiquemos una foto o historia nueva.</p>
+            <form id="formSuscripcion" novalidate>
+                <input
+                    type="email"
+                    id="inputCorreo"
+                    name="correo"
+                    placeholder="tu@correo.com"
+                    autocomplete="email"
+                    required
+                >
+                <button type="submit" id="btn">Suscribirme</button>
+            </form>
+            <p id="mensajeSuscripcion" class="mensaje-suscripcion" role="status" aria-live="polite"></p>
+        </div>
+    </section>
+
+    <section class="social" id="instagram">
+        <h2>Síguela en redes</h2>
+        <a
+            class="ig-boton"
+            href="https://www.instagram.com/misha.gataviral/"
+            target="_blank"
+            rel="noopener noreferrer"
+        >
+            📷 @misha.gataviral en Instagram
+        </a>
+    </section>
+
+    <!-- ===== SEGUNDA PARTE DE LA PÁGINA: DONACIONES ===== -->
+    <section class="donaciones" id="donaciones">
+        <h2>Ayuda con sus croquetas y churus 🐟</h2>
+        <p class="donaciones-intro">
+            Si Misha te robó el corazón y quieres ayudarnos con su comida y sus
+            golosinas favoritas, puedes colaborar por Yape o transferencia. ¡Se
+            agradece muchísimo cada aporte! 💛
+        </p>
+
+        <div class="donaciones-grid">
+            <div class="donaciones-tarjeta donaciones-tarjeta--qr">
+                <img src="img/Qryape.jpeg" alt="Código QR de Yape para donar a Misha" class="donaciones-qr">
+                <p class="donaciones-etiqueta">Escanea con Yape</p>
+            </div>
+
+            <div class="donaciones-tarjeta donaciones-cuenta">
+                <h3>Cuenta bancaria</h3>
+                <p><strong>Banco:</strong> Banco de credito</p>
+                <p><strong>N° de cuenta:</strong> 19478295118076</p>
+                <p><strong>CCI:</strong> 00219417829511807691</p>
+            </div>
+        </div>
+    </section>
+
+    <footer class="pie">
+        <p>Hecho con cariño para Misha 🐈 &middot; <span id="anio"></span></p>
+    </footer>
+
+    <script src="funciones.js"></script>
+</body>
+</html>
