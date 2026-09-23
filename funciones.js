@@ -28,7 +28,7 @@ const fotosMisha = [
     { src: "img/Misha10.jpeg", titulo: "Posando en la cama" },
     { src: "img/Misha11.jpeg", titulo: "Momento de cariño" },
     { src: "img/Misha12.jpeg", titulo: "Abrazo con papá" },
-    { src: "img/misha15.jpeg", titulo: "Actualiza este título" },
+    { src: "img/misha15.jpeg", titulo: "Disfrutando de un anime" },
 ];
 
 const carruselTrack = document.getElementById("carruselTrack");
