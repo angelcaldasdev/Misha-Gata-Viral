@@ -83,18 +83,37 @@ h1, h2 {
     opacity: 0.35;
 }
 
+.hero-fotos {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 28px;
+    position: relative;
+    margin-bottom: 28px;
+}
+
 .caja {
-    width: 320px;
-    height: 320px;
+    width: 220px;
+    height: 220px;
     background-color: var(--jengibre);
     background-image: url("img/misha.jpeg");
     background-size: cover;
     background-position: center;
-    margin: 0 auto 28px;
-    border-radius: 50% 50% 48% 52% / 55% 52% 48% 45%;
+    margin: 0;
+    border-radius: 50%;
     border: 6px solid var(--blanco);
     box-shadow: 0 12px 30px rgba(74, 50, 38, 0.25);
     position: relative;
+}
+
+.hero-foto-lateral {
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 6px solid var(--blanco);
+    box-shadow: 0 12px 30px rgba(74, 50, 38, 0.25);
 }
 
 .hero h1 {
@@ -454,9 +473,14 @@ button:hover {
 /* ===== RESPONSIVO ===== */
 
 @media (max-width: 600px) {
-    .caja {
-        width: 240px;
-        height: 240px;
+    .caja,
+    .hero-foto-lateral {
+        width: 100px;
+        height: 100px;
+    }
+
+    .hero-fotos {
+        gap: 14px;
     }
 
     #formSuscripcion {

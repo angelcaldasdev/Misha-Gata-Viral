@@ -16,18 +16,19 @@ spanAnio.textContent = new Date().getFullYear();
 // de cada foto.
 
 const fotosMisha = [
-    { src: "img/misha.jpeg", titulo: "Curioseando por la puerta", fecha: "" },
-    { src: "img/misha2.jpeg", titulo: "Explorando el pasillo", fecha: "" },
-    { src: "img/misha3.jpeg", titulo: "Siesta en su camita", fecha: "" },
-    { src: "img/Misha4.jpeg", titulo: "Vigilando la sala", fecha: "" },
-    { src: "img/Misha5.jpeg", titulo: "De compras con mamá", fecha: "" },
-    { src: "img/Misha6.jpeg", titulo: "Metida entre la ropa", fecha: "" },
-    { src: "img/Misha7.jpeg", titulo: "Hora de comer", fecha: "" },
-    { src: "img/Misha8.jpeg", titulo: "Jugando con la familia", fecha: "" },
-    { src: "img/Misha9.jpeg", titulo: "Estirándose en la torre rascador", fecha: "" },
-    { src: "img/Misha10.jpeg", titulo: "Posando en la cama", fecha: "" },
-    { src: "img/Misha11.jpeg", titulo: "Momento de cariño", fecha: "" },
-    { src: "img/Misha12.jpeg", titulo: "Abrazo con papá", fecha: "" },
+    { src: "img/misha.jpeg", titulo: "Curioseando por la puerta" },
+    { src: "img/misha2.jpeg", titulo: "Explorando el pasillo" },
+    { src: "img/misha3.jpeg", titulo: "Siesta en su camita" },
+    { src: "img/Misha4.jpeg", titulo: "Vigilando la sala" },
+    { src: "img/Misha5.jpeg", titulo: "De compras con mamá" },
+    { src: "img/Misha6.jpeg", titulo: "Metida entre la ropa" },
+    { src: "img/Misha7.jpeg", titulo: "Hora de comer" },
+    { src: "img/Misha8.jpeg", titulo: "Jugando con la familia" },
+    { src: "img/Misha9.jpeg", titulo: "Estirándose en la torre rascador" },
+    { src: "img/Misha10.jpeg", titulo: "Posando en la cama" },
+    { src: "img/Misha11.jpeg", titulo: "Momento de cariño" },
+    { src: "img/Misha12.jpeg", titulo: "Abrazo con papá" },
+    { src: "img/misha15.jpeg", titulo: "Actualiza este título" },
 ];
 
 const carruselTrack = document.getElementById("carruselTrack");
@@ -51,7 +52,6 @@ function crearSlides() {
         const figcaption = document.createElement("figcaption");
         figcaption.innerHTML = `
             <span class="tarjeta-foto-titulo">${foto.titulo}</span>
-            <span class="tarjeta-foto-fecha">${foto.fecha}</span>
         `;
 
         figure.appendChild(figcaption);
