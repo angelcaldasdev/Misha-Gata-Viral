@@ -245,12 +245,12 @@ const NUMERO_WHATSAPP = "51943147131";
 // ✏️ CAMBIA los precios (en soles) y las tallas si hace falta.
 // Las fotos deben llamarse igual que aquí y estar en la carpeta img/
 const productosMisha = [
-    { id: "polo1",   nombre: "Polo Misha 1",   categoria: "Polo",   precio: 45, imagen: "img/polo1.jpeg",   tallas: ["S", "M", "L", "XL"] },
-    { id: "polo2",   nombre: "Polo Misha 2",   categoria: "Polo",   precio: 45, imagen: "img/polo2.jpeg",   tallas: ["S", "M", "L", "XL"] },
-    { id: "gorra1",  nombre: "Gorra Misha 1",  categoria: "Gorra",  precio: 30, imagen: "img/gorra1.jpeg",  tallas: ["Única"] },
-    { id: "gorra2",  nombre: "Gorra Misha 2",  categoria: "Gorra",  precio: 30, imagen: "img/gorra2.jpeg",  tallas: ["Única"] },
-    { id: "medias1", nombre: "Medias Misha 1", categoria: "Medias", precio: 15, imagen: "img/medias1.jpeg", tallas: ["35-39", "40-44"] },
-    { id: "medias2", nombre: "Medias Misha 2", categoria: "Medias", precio: 15, imagen: "img/medias2.jpeg", tallas: ["35-39", "40-44"] },
+    { id: "polo1",   nombre: "Polo Misha 1",   categoria: "Polo",   precio: 45, imagen: "img/polo1.jpg",   tallas: ["S", "M", "L", "XL"] },
+    { id: "polo2",   nombre: "Polo Misha 2",   categoria: "Polo",   precio: 45, imagen: "img/polo2.jpg",   tallas: ["S", "M", "L", "XL"] },
+    { id: "gorra1",  nombre: "Gorra Misha 1",  categoria: "Gorra",  precio: 30, imagen: "img/gorra1.jpg",  tallas: ["Única"] },
+    { id: "gorra2",  nombre: "Gorra Misha 2",  categoria: "Gorra",  precio: 30, imagen: "img/gorra2.jpg",  tallas: ["Única"] },
+    { id: "medias1", nombre: "Medias Misha 1", categoria: "Medias", precio: 15, imagen: "img/medias1.jpg", tallas: ["35-39", "40-44"] },
+    { id: "medias2", nombre: "Medias Misha 2", categoria: "Medias", precio: 15, imagen: "img/medias2.jpg", tallas: ["35-39", "40-44"] },
 ];
 
 // Emoji de relleno que se ve mientras no subas las fotos reales
