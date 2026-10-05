@@ -118,57 +118,72 @@ carruselTrack.addEventListener("touchend", (evento) => {
     }
 });
 
-// ---- SUSCRIPCIÓN POR CORREO ----
-// IMPORTANTE: esto es una simulación en el navegador (localStorage).
-// Para enviar notificaciones reales por correo cuando subas una foto
-// nueva, necesitas un backend o un servicio externo, por ejemplo:
-//   - Formspree / Mailchimp / Brevo (antes Sendinblue) para capturar
-//     el correo y disparar campañas.
-//   - Un pequeño backend propio (Node + Express) que guarde el correo
-//     en una base de datos y use un servicio de envío (Resend, SendGrid).
-// Por ahora, el formulario valida el correo y lo guarda localmente
-// para que puedas probar la experiencia de usuario.
+// ============================================
+// SUSCRIPCIÓN POR CORREO (conectada al servidor Express)
+// ============================================
 
+// Dirección del servidor. Cuando lo publiques en la nube,
+// cambiarás solo esta línea por la URL pública.
+const URL_SERVIDOR = "http://localhost:3000";
+
+// Elementos del formulario (ids que existen en tu index.html)
 const formSuscripcion = document.getElementById("formSuscripcion");
 const inputCorreo = document.getElementById("inputCorreo");
+const botonSuscribirme = document.getElementById("btn");
 const mensajeSuscripcion = document.getElementById("mensajeSuscripcion");
 
+// Validación básica del formato del correo (antes de enviarlo al servidor)
 const regexCorreo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-formSuscripcion.addEventListener("submit", (evento) => {
+// Muestra un mensaje debajo del formulario.
+// "tipo" puede ser "exito" o "error" (tus clases de color en el CSS)
+function mostrarMensaje(texto, tipo) {
+    mensajeSuscripcion.textContent = texto;
+    mensajeSuscripcion.className = "mensaje-suscripcion " + tipo;
+}
+
+formSuscripcion.addEventListener("submit", async (evento) => {
     // Evita que el formulario recargue la página (comportamiento por defecto)
     evento.preventDefault();
 
     const correoIngresado = inputCorreo.value.trim();
 
+    // 1) Validamos el formato antes de molestar al servidor
     if (!regexCorreo.test(correoIngresado)) {
         mostrarMensaje("Por favor ingresa un correo válido.", "error");
         return;
     }
 
-    const suscriptores = obtenerSuscriptores();
+    // 2) Desactivamos el botón para evitar envíos dobles
+    botonSuscribirme.disabled = true;
+    mostrarMensaje("Enviando...", "");
 
-    if (suscriptores.includes(correoIngresado)) {
-        mostrarMensaje("¡Ese correo ya está suscrito! 🐾", "error");
-        return;
+    try {
+        // 3) Enviamos el correo al servidor Express
+        const respuesta = await fetch(`${URL_SERVIDOR}/api/suscribirse`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ correo: correoIngresado }),
+        });
+
+        const datos = await respuesta.json();
+
+        // 4) Mostramos el mensaje que responde el servidor
+        if (respuesta.ok) {
+            mostrarMensaje(datos.mensaje, "exito");
+            formSuscripcion.reset();
+        } else {
+            // Ejemplo: correo repetido o inválido
+            mostrarMensaje(datos.mensaje, "error");
+        }
+    } catch (error) {
+        // Pasa si el servidor está apagado o no hay conexión
+        mostrarMensaje("No se pudo conectar con el servidor 😿", "error");
+    } finally {
+        // Volvemos a activar el botón pase lo que pase
+        botonSuscribirme.disabled = false;
     }
-
-    suscriptores.push(correoIngresado);
-    localStorage.setItem("suscriptoresMisha", JSON.stringify(suscriptores));
-
-    mostrarMensaje("¡Listo! Te avisaremos con las novedades de Misha 🐱", "exito");
-    formSuscripcion.reset();
 });
-
-function obtenerSuscriptores() {
-    const guardado = localStorage.getItem("suscriptoresMisha");
-    return guardado ? JSON.parse(guardado) : [];
-}
-
-function mostrarMensaje(texto, tipo) {
-    mensajeSuscripcion.textContent = texto;
-    mensajeSuscripcion.className = "mensaje-suscripcion " + tipo;
-}
 
 // ---- REFERENCIA DE EVENTOS (repaso del curso) ----
 // keydown          : cuando escribimos en un formulario

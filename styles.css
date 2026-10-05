@@ -303,55 +303,34 @@ h1, h2 {
     margin: 0 auto 36px;
 }
 
+/* Centramos la única tarjeta en la sección */
 .donaciones-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 28px;
-    max-width: 640px;
-    margin: 0 auto;
+    display: flex;
+    justify-content: center;
 }
 
-.donaciones-tarjeta {
-    background-color: var(--blanco);
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 10px 24px rgba(74, 50, 38, 0.12);
-}
-
+/* Tarjeta blanca que "abraza" el QR: se ajusta al ancho de la imagen */
 .donaciones-tarjeta--qr {
-    width: fit-content;
-    max-width: 100%;
-    margin: 0 auto;
-    justify-self: center;
+    width: fit-content;          /* ancho = ancho del QR + padding */
+    padding: 14px 14px 18px;     /* borde parejo alrededor del QR */
+    background: #ffffff;
+    border-radius: 30px;         /* = radio del QR (16px) + padding (14px) */
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+    text-align: center;
 }
 
+/* El QR mantiene sus proporciones y esquinas redondeadas */
 .donaciones-qr {
-    width: 100%;
-    max-width: 200px;
-    border-radius: 12px;
-    margin: 0 auto 12px;
     display: block;
+    width: 240px;
+    max-width: 100%;             /* en celulares pequeños no se desborda */
+    height: auto;
+    border-radius: 16px;
 }
 
 .donaciones-etiqueta {
-    margin: 0;
+    margin: 12px 0 0;
     font-weight: 700;
-    color: var(--chocolate);
-}
-
-.donaciones-cuenta {
-    text-align: left;
-}
-
-.donaciones-cuenta h3 {
-    font-family: var(--fuente-titulo);
-    color: var(--chocolate);
-    margin-top: 0;
-}
-
-.donaciones-cuenta p {
-    margin: 6px 0;
-    font-size: 0.95rem;
 }
 
 /* ===== SUSCRIPCIÓN ===== */
