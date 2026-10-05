@@ -13,7 +13,9 @@
 
     <nav class="nav-principal">
         <a href="#inicio">Inicio</a>
+        <a href="#datos">Datos</a>
         <a href="#galeria">Galería</a>
+        <a href="#productos">Productos</a>
         <a href="#donaciones">Donaciones</a>
         <a href="#suscripcion">Suscríbete</a>
         <a href="#instagram">Instagram</a>
@@ -31,16 +33,10 @@
         <p class="hero-subtitulo">Calicó, dormilona y estrella de la casa 🐾</p>
     </header>
 
-    <section class="datos">
+    <!-- DATOS DE MISHA: los cuadros se generan desde funciones.js (arreglo datosMisha) -->
+    <section class="datos" id="datos">
         <h2>Datos de Misha</h2>
-        <ul class="datos-lista">
-            <li>😴 Dormir mucho, en especial durante el día.</li>
-            <li>🔌 Jugar con cables (su travesura favorita).</li>
-            <li>🥰 Ser muy linda y tierna con toda la familia.</li>
-            <li>🕵️‍♀️ Introvertida y sigilosa.</li>
-            <li>🐟 Amante del churu.</li>
-            <li>🎂 Tiene 1 año recién cumplido de edad.</li>
-        </ul>
+        <div class="datos-grid" id="datosGrid"></div>
     </section>
 
     <!-- COLORES -->
@@ -62,6 +58,48 @@
 
         <div class="carrusel-indicadores" id="carruselIndicadores"></div>
     </section>
+
+    <!-- PRODUCTOS: las tarjetas se generan desde funciones.js (arreglo productosMisha) -->
+    <section class="productos" id="productos">
+        <h2>Productos de Misha 🛍️</h2>
+        <p class="productos-intro">
+            Polos, gorras y medias con la carita de Misha. ¡Cada compra ayuda con sus croquetas y churus! 🐟
+        </p>
+        <div class="productos-grid" id="productosGrid"></div>
+    </section>
+
+    <!-- Ventana emergente para hacer el pedido -->
+    <dialog id="modalPedido" class="modal-pedido">
+        <!-- Este formulario solo sirve para cerrar la ventana -->
+        <form method="dialog" class="modal-cerrar">
+            <button aria-label="Cerrar ventana">✕</button>
+        </form>
+
+        <h3 id="modalNombre"></h3>
+        <p id="modalPrecio" class="modal-precio"></p>
+
+        <div class="modal-campos">
+            <label>Tu nombre
+                <input type="text" id="pedidoNombre" placeholder="Ej: Ana Pérez">
+            </label>
+            <label>Talla
+                <select id="pedidoTalla"></select>
+            </label>
+            <label>Cantidad
+                <input type="number" id="pedidoCantidad" min="1" max="10" value="1">
+            </label>
+        </div>
+
+        <p class="modal-total">Total: <strong id="pedidoTotal"></strong></p>
+
+        <div class="modal-pago">
+            <p><strong>1)</strong> Paga con Yape escaneando este QR:</p>
+            <img src="img/Qryape.jpeg" alt="Código QR de Yape para pagar tu pedido" class="modal-qr">
+            <p><strong>2)</strong> Envíanos tu pedido y la captura del pago:</p>
+            <button type="button" id="botonEnviarPedido">Enviar pedido por WhatsApp</button>
+            <p id="mensajePedido" class="mensaje-pedido" role="status" aria-live="polite"></p>
+        </div>
+    </dialog>
 
     <!-- DISEÑO RESPONSIVO WEB -->
     <!-- MOBILE FIRST -->
@@ -98,25 +136,23 @@
         </a>
     </section>
 
-    
     <!-- ===== SEGUNDA PARTE DE LA PÁGINA: DONACIONES ===== -->
     <section class="donaciones" id="donaciones">
         <h2>Ayuda con sus croquetas y churus 🐟</h2>
         <p class="donaciones-intro">
             Si Misha te robó el corazón y quieres ayudarnos con su comida y sus
-            golosinas favoritas, puedes colaborar por Yape o transferencia. ¡Se
-            agradece muchísimo cada aporte! 💛
+            golosinas favoritas, puedes colaborar con Yape. ¡Se agradece
+            muchísimo cada aporte! 💛
         </p>
 
-       <div class="donaciones-grid">
-        <!-- Única tarjeta: solo el QR de Yape -->
-        <div class="donaciones-tarjeta donaciones-tarjeta--qr">
-        <img src="img/Qryape.jpeg" alt="Código QR de Yape para donar a Misha" class="donaciones-qr">
-        <p class="donaciones-etiqueta">Escanea con Yape</p>
-        </div>
+        <div class="donaciones-grid">
+            <!-- Única tarjeta: solo el QR de Yape -->
+            <div class="donaciones-tarjeta donaciones-tarjeta--qr">
+                <img src="img/Qryape.jpeg" alt="Código QR de Yape para donar a Misha" class="donaciones-qr">
+                <p class="donaciones-etiqueta">Escanea con Yape</p>
+            </div>
         </div>
     </section>
-
 
     <footer class="pie">
         <p>Hecho con cariño para Misha 🐈 &middot; <span id="anio"></span></p>

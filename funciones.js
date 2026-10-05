@@ -195,3 +195,182 @@ formSuscripcion.addEventListener("submit", async (evento) => {
 // submit           : cuando enviamos un formulario
 // mouseover        : cuando pasamos el mouse por encima de un elemento
 // DOMContentLoaded : cuando el DOM está cargado y listo para ser manipulado
+
+// ============================================
+// DATOS DE MISHA (cuadros 3 columnas x 4 filas = 12)
+// ============================================
+const datosMisha = [
+    { emoji: "😴", titulo: "Dormilona", descripcion: "Le encanta dormir mucho, en especial durante el día." },
+    { emoji: "🔌", titulo: "Travesura favorita", descripcion: "Jugar con cables es lo que más disfruta." },
+    { emoji: "🥰", titulo: "Muy cariñosa", descripcion: "Linda y tierna con toda la familia." },
+    { emoji: "🕵️‍♀️", titulo: "Sigilosa", descripcion: "Introvertida: se mueve por la casa sin hacer ruido." },
+    { emoji: "🐟", titulo: "Amante del churu", descripcion: "Su golosina favorita, junto con sus croquetas." },
+    { emoji: "🎂", titulo: "1 añito", descripcion: "Acaba de cumplir su primer año de vida." },
+    { emoji: "🎨", titulo: "Pelaje calicó", descripcion: "Mezcla blanco, negro y naranja en un solo gatito." },
+    { emoji: "⭐", titulo: "Estrella de la casa", descripcion: "Todos giran alrededor de ella." },
+    { emoji: "📸", titulo: "Viral en Instagram", descripcion: "La encuentras como @misha.gataviral." },
+    // ✏️ EDITA estos 3 con datos reales de Misha:
+    { emoji: "📍", titulo: "Su lugar favorito", descripcion: "✏️ Cuéntanos dónde le gusta descansar." },
+    { emoji: "🧸", titulo: "Su juguete favorito", descripcion: "✏️ Escribe con qué juega más." },
+    { emoji: "🌙", titulo: "Sus noches", descripcion: "✏️ Escribe qué hace Misha de noche." },
+];
+
+const datosGrid = document.getElementById("datosGrid");
+
+// Crea un cuadro por cada dato de la lista
+function crearTarjetasDatos() {
+    if (!datosGrid) return;
+
+    datosMisha.forEach((dato) => {
+        const tarjeta = document.createElement("article");
+        tarjeta.className = "dato-tarjeta";
+        tarjeta.innerHTML = `
+            <span class="dato-emoji" aria-hidden="true">${dato.emoji}</span>
+            <h3 class="dato-titulo">${dato.titulo}</h3>
+            <p class="dato-descripcion">${dato.descripcion}</p>
+        `;
+        datosGrid.appendChild(tarjeta);
+    });
+}
+
+crearTarjetasDatos();
+
+// ============================================
+// PRODUCTOS Y PEDIDOS (pago con Yape + pedido por WhatsApp)
+// ============================================
+
+// ✏️ CAMBIA por tu número: código de país 51 + tus 9 dígitos (sin espacios ni "+")
+const NUMERO_WHATSAPP = "51943147131";
+
+// ✏️ CAMBIA los precios (en soles) y las tallas si hace falta.
+// Las fotos deben llamarse igual que aquí y estar en la carpeta img/
+const productosMisha = [
+    { id: "polo1",   nombre: "Polo Misha 1",   categoria: "Polo",   precio: 45, imagen: "img/polo1.jpeg",   tallas: ["S", "M", "L", "XL"] },
+    { id: "polo2",   nombre: "Polo Misha 2",   categoria: "Polo",   precio: 45, imagen: "img/polo2.jpeg",   tallas: ["S", "M", "L", "XL"] },
+    { id: "gorra1",  nombre: "Gorra Misha 1",  categoria: "Gorra",  precio: 30, imagen: "img/gorra1.jpeg",  tallas: ["Única"] },
+    { id: "gorra2",  nombre: "Gorra Misha 2",  categoria: "Gorra",  precio: 30, imagen: "img/gorra2.jpeg",  tallas: ["Única"] },
+    { id: "medias1", nombre: "Medias Misha 1", categoria: "Medias", precio: 15, imagen: "img/medias1.jpeg", tallas: ["35-39", "40-44"] },
+    { id: "medias2", nombre: "Medias Misha 2", categoria: "Medias", precio: 15, imagen: "img/medias2.jpeg", tallas: ["35-39", "40-44"] },
+];
+
+// Emoji de relleno que se ve mientras no subas las fotos reales
+const emojiPorCategoria = { Polo: "👕", Gorra: "🧢", Medias: "🧦" };
+
+const productosGrid = document.getElementById("productosGrid");
+const modalPedido = document.getElementById("modalPedido");
+const modalNombre = document.getElementById("modalNombre");
+const modalPrecio = document.getElementById("modalPrecio");
+const pedidoNombre = document.getElementById("pedidoNombre");
+const pedidoTalla = document.getElementById("pedidoTalla");
+const pedidoCantidad = document.getElementById("pedidoCantidad");
+const pedidoTotal = document.getElementById("pedidoTotal");
+const botonEnviarPedido = document.getElementById("botonEnviarPedido");
+const mensajePedido = document.getElementById("mensajePedido");
+
+// Producto que la persona eligió en este momento
+let productoSeleccionado = null;
+
+// Da formato de soles: 45 -> "S/ 45.00"
+function formatearSoles(monto) {
+    return "S/ " + monto.toFixed(2);
+}
+
+// Crea una tarjeta por cada producto de la lista
+function crearTarjetasProductos() {
+    productosMisha.forEach((producto) => {
+        const tarjeta = document.createElement("article");
+        tarjeta.className = "producto-tarjeta";
+
+        // Caja de la foto: el emoji queda de fondo y la imagen se pone encima
+        const cajaFoto = document.createElement("div");
+        cajaFoto.className = "producto-foto";
+        cajaFoto.textContent = emojiPorCategoria[producto.categoria];
+
+        const imagen = document.createElement("img");
+        imagen.src = producto.imagen;
+        imagen.alt = producto.nombre;
+        imagen.loading = "lazy";
+        // Si la foto todavía no existe, se quita y se queda el emoji
+        imagen.addEventListener("error", () => imagen.remove());
+        cajaFoto.appendChild(imagen);
+
+        const info = document.createElement("div");
+        info.className = "producto-info";
+        info.innerHTML = `
+            <h3 class="producto-nombre">${producto.nombre}</h3>
+            <p class="producto-precio">${formatearSoles(producto.precio)}</p>
+        `;
+
+        const botonPedir = document.createElement("button");
+        botonPedir.textContent = "Pedir";
+        botonPedir.addEventListener("click", () => abrirModalPedido(producto));
+        info.appendChild(botonPedir);
+
+        tarjeta.appendChild(cajaFoto);
+        tarjeta.appendChild(info);
+        productosGrid.appendChild(tarjeta);
+    });
+}
+
+// Abre la ventana con los datos del producto elegido
+function abrirModalPedido(producto) {
+    productoSeleccionado = producto;
+
+    modalNombre.textContent = producto.nombre;
+    modalPrecio.textContent = formatearSoles(producto.precio);
+
+    // Llenamos las tallas disponibles de ese producto
+    pedidoTalla.innerHTML = "";
+    producto.tallas.forEach((talla) => {
+        const opcion = document.createElement("option");
+        opcion.value = talla;
+        opcion.textContent = talla;
+        pedidoTalla.appendChild(opcion);
+    });
+
+    pedidoCantidad.value = 1;
+    mensajePedido.textContent = "";
+    actualizarTotal();
+    modalPedido.showModal();
+}
+
+// Recalcula el total cuando cambia la cantidad
+function actualizarTotal() {
+    const cantidad = parseInt(pedidoCantidad.value, 10) || 0;
+    pedidoTotal.textContent = formatearSoles(productoSeleccionado.precio * cantidad);
+}
+
+// Arma el mensaje y abre WhatsApp con el pedido listo para enviar
+function enviarPedidoPorWhatsApp() {
+    const nombreCliente = pedidoNombre.value.trim();
+    const cantidad = parseInt(pedidoCantidad.value, 10);
+
+    if (nombreCliente === "") {
+        mensajePedido.textContent = "Escribe tu nombre para continuar 🐾";
+        return;
+    }
+    if (!cantidad || cantidad < 1 || cantidad > 10) {
+        mensajePedido.textContent = "La cantidad debe estar entre 1 y 10.";
+        return;
+    }
+
+    const total = productoSeleccionado.precio * cantidad;
+    const mensaje =
+        "Hola, quiero hacer un pedido de la tienda de Misha 🐱\n" +
+        `• Producto: ${productoSeleccionado.nombre}\n` +
+        `• Talla: ${pedidoTalla.value}\n` +
+        `• Cantidad: ${cantidad}\n` +
+        `• Total: ${formatearSoles(total)}\n` +
+        `• A nombre de: ${nombreCliente}\n` +
+        "Te envío la captura de mi pago por Yape.";
+
+    const enlace = `https://wa.me/${NUMERO_WHATSAPP}?text=${encodeURIComponent(mensaje)}`;
+    window.open(enlace, "_blank", "noopener");
+}
+
+// Solo activamos todo si la sección de productos existe en la página
+if (productosGrid && modalPedido) {
+    crearTarjetasProductos();
+    pedidoCantidad.addEventListener("input", actualizarTotal);
+    botonEnviarPedido.addEventListener("click", enviarPedidoPorWhatsApp);
+}

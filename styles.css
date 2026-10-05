@@ -83,19 +83,21 @@ h1, h2 {
     opacity: 0.35;
 }
 
+/* Las 3 fotos ocupan todo el ancho: izquierda, centro y derecha */
 .hero-fotos {
-    display: flex;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 28px;
+    width: min(1100px, 94%);
+    margin: 0 auto 40px;
     position: relative;
-    margin-bottom: 28px;
 }
 
+/* Foto del centro (usa la imagen de fondo) un poco más grande */
 .caja {
-    width: 220px;
-    height: 220px;
+    width: 100%;
+    aspect-ratio: 1 / 1;            /* siempre cuadrada = círculo perfecto */
     background-color: var(--jengibre);
     background-image: url("img/misha.jpeg");
     background-size: cover;
@@ -105,11 +107,13 @@ h1, h2 {
     border: 6px solid var(--blanco);
     box-shadow: 0 12px 30px rgba(74, 50, 38, 0.25);
     position: relative;
+    transform: scale(1.12);
 }
 
+/* Fotos de los lados */
 .hero-foto-lateral {
-    width: 220px;
-    height: 220px;
+    width: 100%;
+    aspect-ratio: 1 / 1;
     border-radius: 50%;
     object-fit: cover;
     border: 6px solid var(--blanco);
@@ -129,33 +133,64 @@ h1, h2 {
     position: relative;
 }
 
-/* ===== DATOS ===== */
+/* ===== DATOS (cuadros 3 columnas x 4 filas) ===== */
 
 .datos {
-    max-width: 640px;
-    margin: 0 auto;
     padding: 56px 20px;
     text-align: center;
 }
 
 .datos h2 {
     font-size: 1.8rem;
-    margin-bottom: 24px;
+    margin-bottom: 28px;
 }
 
-.datos-lista {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+.datos-grid {
     display: grid;
-    gap: 14px;
-    font-size: 1.05rem;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    width: min(1100px, 94%);
+    margin: 0 auto;
 }
 
-.datos-lista li {
+.dato-tarjeta {
+    aspect-ratio: 1 / 1;              /* cuadrados perfectos */
     background-color: var(--crema);
-    padding: 14px 20px;
-    border-radius: 14px;
+    border-radius: 22px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;          /* el contenido llena el cuadro */
+    gap: 10px;
+    text-align: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Tres tonos que se alternan para que no se vea monótono */
+.dato-tarjeta:nth-child(3n + 2) { background-color: #F9DCC0; }
+.dato-tarjeta:nth-child(3n + 3) { background-color: #FBF1DF; }
+
+.dato-tarjeta:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 24px rgba(74, 50, 38, 0.15);
+}
+
+.dato-emoji {
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    line-height: 1;
+}
+
+.dato-titulo {
+    margin: 0;
+    font-family: var(--fuente-titulo);
+    color: var(--chocolate);
+    font-size: clamp(1.1rem, 2vw, 1.5rem);
+}
+
+.dato-descripcion {
+    margin: 0;
+    font-size: clamp(0.9rem, 1.4vw, 1.05rem);
 }
 
 /* ===== GALERÍA ===== */
@@ -449,17 +484,201 @@ button:hover {
     font-size: 0.9rem;
 }
 
+/* ===== PRODUCTOS ===== */
+
+.productos {
+    padding: 64px 20px;
+    text-align: center;
+}
+
+.productos h2 {
+    font-size: 1.8rem;
+    margin-bottom: 10px;
+}
+
+.productos-intro {
+    max-width: 560px;
+    margin: 0 auto;
+}
+
+.productos-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    width: min(1100px, 94%);
+    margin: 32px auto 0;
+}
+
+.producto-tarjeta {
+    background-color: var(--blanco);
+    border-radius: 22px;
+    overflow: hidden;
+    box-shadow: 0 8px 22px rgba(74, 50, 38, 0.14);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s ease;
+}
+
+.producto-tarjeta:hover {
+    transform: translateY(-6px);
+}
+
+/* Caja de la foto: si la imagen aún no existe, se ve el emoji de relleno */
+.producto-foto {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    background-color: var(--crema);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4rem;
+}
+
+.producto-foto img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.producto-info {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.producto-nombre {
+    margin: 0;
+    font-family: var(--fuente-titulo);
+    color: var(--chocolate);
+    font-size: 1.2rem;
+}
+
+.producto-precio {
+    margin: 0;
+    font-weight: 700;
+    color: var(--jengibre);
+    font-size: 1.1rem;
+}
+
+/* ===== VENTANA DEL PEDIDO ===== */
+
+.modal-pedido {
+    border: none;
+    border-radius: 22px;
+    padding: 24px;
+    width: min(440px, 92%);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    color: var(--gris-texto);
+    text-align: center;
+}
+
+.modal-pedido::backdrop {
+    background: rgba(74, 50, 38, 0.6);
+}
+
+/* Botón ✕: pequeño y a la derecha (anula el estilo general de button) */
+.modal-cerrar {
+    text-align: right;
+}
+
+.modal-cerrar button {
+    width: auto;
+    padding: 4px 10px;
+    background: none;
+    color: var(--chocolate);
+    font-size: 1.3rem;
+}
+
+.modal-cerrar button:hover {
+    background: none;
+    color: var(--jengibre);
+}
+
+#modalNombre {
+    margin: 0;
+    font-family: var(--fuente-titulo);
+    color: var(--chocolate);
+    font-size: 1.5rem;
+}
+
+.modal-precio {
+    margin: 4px 0 12px;
+    font-weight: 700;
+    color: var(--jengibre);
+}
+
+.modal-campos {
+    display: grid;
+    gap: 12px;
+    margin: 12px 0;
+}
+
+.modal-campos label {
+    display: grid;
+    gap: 4px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.modal-campos input,
+.modal-campos select {
+    padding: 10px 12px;
+    border: 2px solid var(--jengibre);
+    border-radius: 8px;
+    font: inherit;
+}
+
+.modal-total {
+    font-size: 1.15rem;
+}
+
+.modal-qr {
+    display: block;
+    width: 200px;
+    max-width: 100%;
+    margin: 8px auto 16px;
+    border-radius: 16px;
+}
+
+.mensaje-pedido {
+    min-height: 22px;
+    margin: 12px 0 0;
+    font-weight: 600;
+    color: #C62828;
+}
+
 /* ===== RESPONSIVO ===== */
 
+@media (max-width: 800px) {
+    /* Productos: 2 columnas en tablet y celular */
+    .productos-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+    }
+}
+
 @media (max-width: 600px) {
-    .caja,
-    .hero-foto-lateral {
-        width: 100px;
-        height: 100px;
+    /* Fotos de portada: siguen las 3 en fila, más juntas y con borde fino */
+    .hero-fotos {
+        gap: 10px;
     }
 
-    .hero-fotos {
-        gap: 14px;
+    .caja,
+    .hero-foto-lateral {
+        border-width: 3px;
+    }
+
+    /* Datos: 2 columnas en celular */
+    .datos-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .dato-tarjeta {
+        padding: 12px;
     }
 
     #formSuscripcion {
@@ -477,9 +696,5 @@ button:hover {
     .carrusel-flecha {
         width: 36px;
         height: 36px;
-    }
-
-    .donaciones-cuenta {
-        text-align: center;
     }
 }
