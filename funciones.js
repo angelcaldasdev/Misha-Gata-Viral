@@ -6,14 +6,44 @@
 const spanAnio = document.getElementById("anio");
 spanAnio.textContent = new Date().getFullYear();
 
+// Validación básica del formato del correo (se usa en cuenta y suscripción)
+const regexCorreo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// ---- Ayudas para guardar datos en el navegador (localStorage) ----
+function leerAlmacen(clave, valorPorDefecto) {
+    try {
+        const texto = localStorage.getItem(clave);
+        return texto ? JSON.parse(texto) : valorPorDefecto;
+    } catch (error) {
+        return valorPorDefecto;
+    }
+}
+
+function guardarAlmacen(clave, valor) {
+    try {
+        localStorage.setItem(clave, JSON.stringify(valor));
+    } catch (error) {
+        // Si el navegador no deja guardar, la página sigue funcionando
+    }
+}
+
+// Aviso flotante corto (ej: "Agregado al carrito")
+const avisoFlotante = document.getElementById("avisoFlotante");
+let temporizadorAviso = null;
+
+function mostrarAviso(texto) {
+    avisoFlotante.textContent = texto;
+    avisoFlotante.classList.add("visible");
+    clearTimeout(temporizadorAviso);
+    temporizadorAviso = setTimeout(() => avisoFlotante.classList.remove("visible"), 2200);
+}
+
 // ============================================
-// CARRUSEL DE FOTOS
+// CARRUSEL DE FOTOS (varias fotos a la vez)
 // ============================================
 // IMPORTANTE: revisa los nombres de archivo y las
 // extensiones (.jpg/.jpeg/.png) para que coincidan
 // exactamente con tus fotos dentro de la carpeta img/.
-// Cambia también "fecha" y "titulo" por los datos reales
-// de cada foto.
 
 const fotosMisha = [
     { src: "img/misha.jpeg", titulo: "Curioseando por la puerta" },
@@ -31,11 +61,13 @@ const fotosMisha = [
     { src: "img/misha15.jpeg", titulo: "Disfrutando de un anime" },
 ];
 
+const carrusel = document.getElementById("carrusel");
 const carruselTrack = document.getElementById("carruselTrack");
 const carruselIndicadores = document.getElementById("carruselIndicadores");
 const flechaIzq = document.getElementById("flechaIzq");
 const flechaDer = document.getElementById("flechaDer");
 
+// Posición actual = índice de la primera foto visible
 let indiceActual = 0;
 
 function crearSlides() {
@@ -50,27 +82,44 @@ function crearSlides() {
         figure.appendChild(img);
 
         const figcaption = document.createElement("figcaption");
-        figcaption.innerHTML = `
-            <span class="tarjeta-foto-titulo">${foto.titulo}</span>
-        `;
-
+        figcaption.innerHTML = `<span class="tarjeta-foto-titulo">${foto.titulo}</span>`;
         figure.appendChild(figcaption);
+
         carruselTrack.appendChild(figure);
     });
 }
 
+// Cuántas fotos se ven a la vez (lo define el CSS con --visibles: 4, 2 o 1)
+function cantidadVisibles() {
+    const valor = getComputedStyle(carrusel).getPropertyValue("--visibles");
+    return parseInt(valor, 10) || 1;
+}
+
+// Último índice al que se puede llegar sin dejar espacios vacíos
+function indiceMaximo() {
+    return Math.max(0, fotosMisha.length - cantidadVisibles());
+}
+
+// Un punto por cada posición posible del carrusel
 function crearIndicadores() {
-    fotosMisha.forEach((_, indice) => {
+    carruselIndicadores.innerHTML = "";
+    for (let indice = 0; indice <= indiceMaximo(); indice++) {
         const punto = document.createElement("button");
+        punto.type = "button";
         punto.className = "carrusel-punto";
-        punto.setAttribute("aria-label", `Ir a la foto ${indice + 1}`);
+        punto.setAttribute("aria-label", `Ir a la posición ${indice + 1}`);
         punto.addEventListener("click", () => irAFoto(indice));
         carruselIndicadores.appendChild(punto);
-    });
+    }
 }
 
 function actualizarCarrusel() {
-    carruselTrack.style.transform = `translateX(-${indiceActual * 100}%)`;
+    if (indiceActual > indiceMaximo()) {
+        indiceActual = indiceMaximo();
+    }
+
+    // El CSS usa --indice para calcular cuánto se desplaza el carrusel
+    carruselTrack.style.setProperty("--indice", indiceActual);
 
     const puntos = carruselIndicadores.querySelectorAll(".carrusel-punto");
     puntos.forEach((punto, indice) => {
@@ -84,12 +133,12 @@ function irAFoto(indice) {
 }
 
 function fotoSiguiente() {
-    indiceActual = (indiceActual + 1) % fotosMisha.length;
+    indiceActual = indiceActual >= indiceMaximo() ? 0 : indiceActual + 1;
     actualizarCarrusel();
 }
 
 function fotoAnterior() {
-    indiceActual = (indiceActual - 1 + fotosMisha.length) % fotosMisha.length;
+    indiceActual = indiceActual <= 0 ? indiceMaximo() : indiceActual - 1;
     actualizarCarrusel();
 }
 
@@ -100,6 +149,12 @@ actualizarCarrusel();
 flechaDer.addEventListener("click", fotoSiguiente);
 flechaIzq.addEventListener("click", fotoAnterior);
 
+// Si cambia el tamaño de la pantalla, cambia cuántas fotos se ven: recalculamos
+window.addEventListener("resize", () => {
+    crearIndicadores();
+    actualizarCarrusel();
+});
+
 // Deslizar con el dedo en celulares (touch)
 let posicionInicialX = 0;
 
@@ -108,8 +163,7 @@ carruselTrack.addEventListener("touchstart", (evento) => {
 });
 
 carruselTrack.addEventListener("touchend", (evento) => {
-    const posicionFinalX = evento.changedTouches[0].clientX;
-    const diferencia = posicionFinalX - posicionInicialX;
+    const diferencia = evento.changedTouches[0].clientX - posicionInicialX;
 
     if (diferencia > 50) {
         fotoAnterior();
@@ -126,24 +180,19 @@ carruselTrack.addEventListener("touchend", (evento) => {
 // cambiarás solo esta línea por la URL pública.
 const URL_SERVIDOR = "http://localhost:3000";
 
-// Elementos del formulario (ids que existen en tu index.html)
 const formSuscripcion = document.getElementById("formSuscripcion");
 const inputCorreo = document.getElementById("inputCorreo");
+const aceptoPrivacidad = document.getElementById("aceptoPrivacidad");
 const botonSuscribirme = document.getElementById("btn");
 const mensajeSuscripcion = document.getElementById("mensajeSuscripcion");
 
-// Validación básica del formato del correo (antes de enviarlo al servidor)
-const regexCorreo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// Muestra un mensaje debajo del formulario.
-// "tipo" puede ser "exito" o "error" (tus clases de color en el CSS)
+// Muestra un mensaje debajo del formulario ("exito" o "error")
 function mostrarMensaje(texto, tipo) {
     mensajeSuscripcion.textContent = texto;
     mensajeSuscripcion.className = "mensaje-suscripcion " + tipo;
 }
 
 formSuscripcion.addEventListener("submit", async (evento) => {
-    // Evita que el formulario recargue la página (comportamiento por defecto)
     evento.preventDefault();
 
     const correoIngresado = inputCorreo.value.trim();
@@ -154,12 +203,17 @@ formSuscripcion.addEventListener("submit", async (evento) => {
         return;
     }
 
-    // 2) Desactivamos el botón para evitar envíos dobles
+    // 2) Debe aceptar la política de privacidad
+    if (!aceptoPrivacidad.checked) {
+        mostrarMensaje("Debes aceptar la política de privacidad para continuar.", "error");
+        return;
+    }
+
+    // 3) Desactivamos el botón para evitar envíos dobles
     botonSuscribirme.disabled = true;
     mostrarMensaje("Enviando...", "");
 
     try {
-        // 3) Enviamos el correo al servidor Express
         const respuesta = await fetch(`${URL_SERVIDOR}/api/suscribirse`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -168,19 +222,15 @@ formSuscripcion.addEventListener("submit", async (evento) => {
 
         const datos = await respuesta.json();
 
-        // 4) Mostramos el mensaje que responde el servidor
         if (respuesta.ok) {
             mostrarMensaje(datos.mensaje, "exito");
             formSuscripcion.reset();
         } else {
-            // Ejemplo: correo repetido o inválido
             mostrarMensaje(datos.mensaje, "error");
         }
     } catch (error) {
-        // Pasa si el servidor está apagado o no hay conexión
         mostrarMensaje("No se pudo conectar con el servidor 😿", "error");
     } finally {
-        // Volvemos a activar el botón pase lo que pase
         botonSuscribirme.disabled = false;
     }
 });
@@ -197,45 +247,68 @@ formSuscripcion.addEventListener("submit", async (evento) => {
 // DOMContentLoaded : cuando el DOM está cargado y listo para ser manipulado
 
 // ============================================
-// DATOS DE MISHA (cuadros 3 columnas x 4 filas = 12)
+// CONOCE A MISHA (etiquetas) Y UN DÍA EN LA VIDA DE MISHA
 // ============================================
-const datosMisha = [
-    { emoji: "😴", titulo: "Dormilona", descripcion: "Le encanta dormir mucho, en especial durante el día." },
-    { emoji: "🔌", titulo: "Travesura favorita", descripcion: "Jugar con cables es lo que más disfruta." },
-    { emoji: "🥰", titulo: "Muy cariñosa", descripcion: "Linda y tierna con toda la familia." },
-    { emoji: "🕵️‍♀️", titulo: "Sigilosa", descripcion: "Introvertida: se mueve por la casa sin hacer ruido." },
-    { emoji: "🐟", titulo: "Amante del churu", descripcion: "Su golosina favorita, junto con sus croquetas." },
-    { emoji: "🎂", titulo: "1 añito", descripcion: "Acaba de cumplir su primer año de vida." },
-    { emoji: "🎨", titulo: "Pelaje calicó", descripcion: "Mezcla blanco, negro y naranja en un solo gatito." },
-    { emoji: "⭐", titulo: "Estrella de la casa", descripcion: "Todos giran alrededor de ella." },
-    { emoji: "📸", titulo: "Viral en Instagram", descripcion: "La encuentras como @misha.gataviral." },
-    { emoji: "📍", titulo: "Su lugar favorito", descripcion: "Dormir en cualquier parte de casa" },
-    { emoji: "🧸", titulo: "Su juguete favorito", descripcion: "Estrella con cascabel" },
-    { emoji: "🌙", titulo: "Sus noches", descripcion: "Juega y explorar toda la casa" },
+
+// ✏️ Etiquetas cortas de la sección "Conoce a Misha"
+const etiquetasMisha = [
+    { emoji: "🎂", texto: "1 añito" },
+    { emoji: "🎨", texto: "Calicó" },
+    { emoji: "😴", texto: "Dormilona" },
+    { emoji: "🥰", texto: "Muy cariñosa" },
+    { emoji: "🐟", texto: "Amante del churu" },
+    { emoji: "🧸", texto: "Estrella con cascabel" },
+    { emoji: "📸", texto: "@misha.gataviral" },
 ];
 
-const datosGrid = document.getElementById("datosGrid");
+// ✏️ Pasos de "Un día en la vida de Misha" (cambia textos y momentos a tu gusto)
+const diaDeMisha = [
+    { emoji: "🌅", momento: "Mañana", titulo: "Croquetas", descripcion: "Desayuna sus croquetas y se estira." },
+    { emoji: "😴", momento: "Día", titulo: "Siesta", descripcion: "Duerme en cualquier parte de la casa." },
+    { emoji: "🥰", momento: "Tarde", titulo: "Cariños", descripcion: "Mimos con toda la familia." },
+    { emoji: "🐟", momento: "Después", titulo: "Hora del churu", descripcion: "Su golosina favorita." },
+    { emoji: "🌙", momento: "Noche", titulo: "A explorar", descripcion: "Juega, explora y se enreda con los cables." },
+];
 
-// Crea un cuadro por cada dato de la lista
-function crearTarjetasDatos() {
-    if (!datosGrid) return;
+const etiquetasContenedor = document.getElementById("etiquetasMisha");
+const lineaTiempo = document.getElementById("lineaTiempo");
 
-    datosMisha.forEach((dato) => {
-        const tarjeta = document.createElement("article");
-        tarjeta.className = "dato-tarjeta";
-        tarjeta.innerHTML = `
-            <span class="dato-emoji" aria-hidden="true">${dato.emoji}</span>
-            <h3 class="dato-titulo">${dato.titulo}</h3>
-            <p class="dato-descripcion">${dato.descripcion}</p>
-        `;
-        datosGrid.appendChild(tarjeta);
+// Crea una etiqueta (chip) por cada elemento de la lista
+function crearEtiquetas() {
+    if (!etiquetasContenedor) return;
+
+    etiquetasMisha.forEach((etiqueta) => {
+        const item = document.createElement("li");
+        item.className = "etiqueta";
+        item.textContent = `${etiqueta.emoji} ${etiqueta.texto}`;
+        etiquetasContenedor.appendChild(item);
     });
 }
 
-crearTarjetasDatos();
+// Crea un paso de la línea de tiempo por cada momento del día
+function crearLineaTiempo() {
+    if (!lineaTiempo) return;
+
+    diaDeMisha.forEach((paso) => {
+        const item = document.createElement("li");
+        item.className = "paso";
+        item.innerHTML = `
+            <span class="paso-icono" aria-hidden="true">${paso.emoji}</span>
+            <div class="paso-texto">
+                <span class="paso-momento">${paso.momento}</span>
+                <h3 class="paso-titulo">${paso.titulo}</h3>
+                <p class="paso-descripcion">${paso.descripcion}</p>
+            </div>
+        `;
+        lineaTiempo.appendChild(item);
+    });
+}
+
+crearEtiquetas();
+crearLineaTiempo();
 
 // ============================================
-// PRODUCTOS Y PEDIDOS (pago con Yape + pedido por WhatsApp)
+// PRODUCTOS
 // ============================================
 
 // ✏️ CAMBIA por tu número: código de país 51 + tus 9 dígitos (sin espacios ni "+")
@@ -244,26 +317,28 @@ const NUMERO_WHATSAPP = "51943147131";
 // ✏️ CAMBIA los precios (en soles) y las tallas si hace falta.
 // Las fotos deben llamarse igual que aquí y estar en la carpeta img/
 const productosMisha = [
-    { id: "polo1",   nombre: "Polo Misha 1",   categoria: "Polo",   precio: 35, imagen: "img/polo1.jpg",   tallas: ["S", "M", "L", "XL"] },
-    { id: "polo2",   nombre: "Polo Misha 2",   categoria: "Polo",   precio: 35, imagen: "img/polo2.jpg",   tallas: ["S", "M", "L", "XL"] },
-    { id: "gorra1",  nombre: "Gorra Misha 1",  categoria: "Gorra",  precio: 25, imagen: "img/gorra1.jpg",  tallas: ["Única"] },
-    { id: "gorra2",  nombre: "Gorra Misha 2",  categoria: "Gorra",  precio: 25, imagen: "img/gorra2.jpg",  tallas: ["Única"] },
-    { id: "medias1", nombre: "Medias Misha 1", categoria: "Medias", precio: 10, imagen: "img/medias1.jpg", tallas: ["35-39", "40-44"] },
-    { id: "medias2", nombre: "Medias Misha 2", categoria: "Medias", precio: 10, imagen: "img/medias2.jpg", tallas: ["35-39", "40-44"] },
+    { id: "polo1",    nombre: "Polo Misha 1",    categoria: "Polo",    precio: 35, imagen: "img/polo1.jpg",    tallas: ["S", "M", "L", "XL"] },
+    { id: "polo2",    nombre: "Polo Misha 2",    categoria: "Polo",    precio: 35, imagen: "img/polo2.jpg",    tallas: ["S", "M", "L", "XL"] },
+    { id: "polo3",    nombre: "Polo Misha 3",    categoria: "Polo",    precio: 35, imagen: "img/polo3.jpg",    tallas: ["S", "M", "L", "XL"] },
+    { id: "polera1",  nombre: "Polera Misha 1",  categoria: "Polera",  precio: 60, imagen: "img/polera1.jpg",  tallas: ["S", "M", "L", "XL"] },
+    { id: "polera2",  nombre: "Polera Misha 2",  categoria: "Polera",  precio: 60, imagen: "img/polera2.jpg",  tallas: ["S", "M", "L", "XL"] },
+    { id: "gorra1",   nombre: "Gorra Misha 1",   categoria: "Gorra",   precio: 25, imagen: "img/gorra1.jpg",   tallas: ["Única"] },
+    { id: "gorra2",   nombre: "Gorra Misha 2",   categoria: "Gorra",   precio: 25, imagen: "img/gorra2.jpg",   tallas: ["Única"] },
+    { id: "medias1",  nombre: "Medias Misha 1",  categoria: "Medias",  precio: 10, imagen: "img/medias1.jpg",  tallas: ["35-39", "40-44"] },
+    { id: "medias2",  nombre: "Medias Misha 2",  categoria: "Medias",  precio: 10, imagen: "img/medias2.jpg",  tallas: ["35-39", "40-44"] },
 ];
 
 // Emoji de relleno que se ve mientras no subas las fotos reales
-const emojiPorCategoria = { Polo: "👕", Gorra: "🧢", Medias: "🧦" };
+const emojiPorCategoria = { Polo: "👕", Polera: "🧥", Gorra: "🧢", Medias: "🧦" };
 
 const productosGrid = document.getElementById("productosGrid");
 const modalPedido = document.getElementById("modalPedido");
 const modalNombre = document.getElementById("modalNombre");
 const modalPrecio = document.getElementById("modalPrecio");
-const pedidoNombre = document.getElementById("pedidoNombre");
 const pedidoTalla = document.getElementById("pedidoTalla");
 const pedidoCantidad = document.getElementById("pedidoCantidad");
 const pedidoTotal = document.getElementById("pedidoTotal");
-const botonEnviarPedido = document.getElementById("botonEnviarPedido");
+const botonAgregarCarrito = document.getElementById("botonAgregarCarrito");
 const mensajePedido = document.getElementById("mensajePedido");
 
 // Producto que la persona eligió en este momento
@@ -274,7 +349,6 @@ function formatearSoles(monto) {
     return "S/ " + monto.toFixed(2);
 }
 
-// Crea una tarjeta por cada producto de la lista
 function crearTarjetasProductos() {
     productosMisha.forEach((producto) => {
         const tarjeta = document.createElement("article");
@@ -289,7 +363,6 @@ function crearTarjetasProductos() {
         imagen.src = producto.imagen;
         imagen.alt = producto.nombre;
         imagen.loading = "lazy";
-        // Si la foto todavía no existe, se quita y se queda el emoji
         imagen.addEventListener("error", () => imagen.remove());
         cajaFoto.appendChild(imagen);
 
@@ -301,7 +374,8 @@ function crearTarjetasProductos() {
         `;
 
         const botonPedir = document.createElement("button");
-        botonPedir.textContent = "Pedir";
+        botonPedir.type = "button";
+        botonPedir.textContent = "Agregar";
         botonPedir.addEventListener("click", () => abrirModalPedido(producto));
         info.appendChild(botonPedir);
 
@@ -311,14 +385,13 @@ function crearTarjetasProductos() {
     });
 }
 
-// Abre la ventana con los datos del producto elegido
+// Abre la ventana para elegir talla y cantidad
 function abrirModalPedido(producto) {
     productoSeleccionado = producto;
 
     modalNombre.textContent = producto.nombre;
     modalPrecio.textContent = formatearSoles(producto.precio);
 
-    // Llenamos las tallas disponibles de ese producto
     pedidoTalla.innerHTML = "";
     producto.tallas.forEach((talla) => {
         const opcion = document.createElement("option");
@@ -333,43 +406,358 @@ function abrirModalPedido(producto) {
     modalPedido.showModal();
 }
 
-// Recalcula el total cuando cambia la cantidad
 function actualizarTotal() {
     const cantidad = parseInt(pedidoCantidad.value, 10) || 0;
     pedidoTotal.textContent = formatearSoles(productoSeleccionado.precio * cantidad);
 }
 
-// Arma el mensaje y abre WhatsApp con el pedido listo para enviar
-function enviarPedidoPorWhatsApp() {
-    const nombreCliente = pedidoNombre.value.trim();
+// Botón "Agregar al carrito" de la ventana del producto
+function confirmarAgregado() {
     const cantidad = parseInt(pedidoCantidad.value, 10);
 
-    if (nombreCliente === "") {
-        mensajePedido.textContent = "Escribe tu nombre para continuar 🐾";
-        return;
-    }
     if (!cantidad || cantidad < 1 || cantidad > 10) {
         mensajePedido.textContent = "La cantidad debe estar entre 1 y 10.";
         return;
     }
 
-    const total = productoSeleccionado.precio * cantidad;
+    agregarAlCarrito(productoSeleccionado, pedidoTalla.value, cantidad);
+    modalPedido.close();
+    mostrarAviso("Agregado al carrito 🛒");
+}
+
+if (productosGrid && modalPedido) {
+    crearTarjetasProductos();
+    pedidoCantidad.addEventListener("input", actualizarTotal);
+    botonAgregarCarrito.addEventListener("click", confirmarAgregado);
+}
+
+// ============================================
+// CARRITO DE COMPRAS
+// ============================================
+// Cada elemento del carrito: { id, talla, cantidad }
+// Se guarda en localStorage para que no se pierda al recargar.
+
+const botonCarrito = document.getElementById("botonCarrito");
+const contadorCarrito = document.getElementById("contadorCarrito");
+const totalCarrito = document.getElementById("totalCarrito");
+const panelCarrito = document.getElementById("panelCarrito");
+const fondoCarrito = document.getElementById("fondoCarrito");
+const cerrarCarritoBoton = document.getElementById("cerrarCarrito");
+const listaCarrito = document.getElementById("listaCarrito");
+const carritoVacio = document.getElementById("carritoVacio");
+const carritoPie = document.getElementById("carritoPie");
+const carritoTotal = document.getElementById("carritoTotal");
+const botonEnviarPedido = document.getElementById("botonEnviarPedido");
+const botonVaciarCarrito = document.getElementById("botonVaciarCarrito");
+const mensajeCarrito = document.getElementById("mensajeCarrito");
+
+// Cargamos el carrito guardado (ignorando productos que ya no existan)
+let carrito = leerAlmacen("misha_carrito", []).filter((item) =>
+    productosMisha.some((producto) => producto.id === item.id)
+);
+
+function buscarProducto(id) {
+    return productosMisha.find((producto) => producto.id === id);
+}
+
+function guardarCarrito() {
+    guardarAlmacen("misha_carrito", carrito);
+}
+
+function agregarAlCarrito(producto, talla, cantidad) {
+    const existente = carrito.find((item) => item.id === producto.id && item.talla === talla);
+
+    if (existente) {
+        existente.cantidad = Math.min(existente.cantidad + cantidad, 10);
+    } else {
+        carrito.push({ id: producto.id, talla: talla, cantidad: cantidad });
+    }
+
+    guardarCarrito();
+    dibujarCarrito();
+}
+
+function calcularTotalCarrito() {
+    return carrito.reduce((suma, item) => suma + buscarProducto(item.id).precio * item.cantidad, 0);
+}
+
+// Redibuja la lista, el contador y los totales
+function dibujarCarrito() {
+    const totalProductos = carrito.reduce((suma, item) => suma + item.cantidad, 0);
+    const total = calcularTotalCarrito();
+
+    contadorCarrito.textContent = totalProductos;
+    totalCarrito.textContent = formatearSoles(total);
+    carritoTotal.textContent = formatearSoles(total);
+
+    const hayProductos = carrito.length > 0;
+    carritoVacio.hidden = hayProductos;
+    carritoPie.hidden = !hayProductos;
+
+    listaCarrito.innerHTML = "";
+
+    carrito.forEach((item) => {
+        const producto = buscarProducto(item.id);
+        const li = document.createElement("li");
+        li.className = "carrito-item";
+        li.innerHTML = `
+            <div class="carrito-item-foto">
+                ${emojiPorCategoria[producto.categoria]}
+                <img src="${producto.imagen}" alt="${producto.nombre}" onerror="this.remove()">
+            </div>
+            <div class="carrito-item-datos">
+                <p class="carrito-item-nombre">${producto.nombre}</p>
+                <p class="carrito-item-detalle">Talla: ${item.talla} · ${formatearSoles(producto.precio)}</p>
+                <div class="carrito-item-controles">
+                    <button type="button" data-accion="restar" data-id="${item.id}" data-talla="${item.talla}" aria-label="Quitar una unidad">−</button>
+                    <span>${item.cantidad}</span>
+                    <button type="button" data-accion="sumar" data-id="${item.id}" data-talla="${item.talla}" aria-label="Agregar una unidad">+</button>
+                    <button type="button" class="boton-quitar" data-accion="quitar" data-id="${item.id}" data-talla="${item.talla}">Quitar</button>
+                </div>
+            </div>
+            <span class="carrito-item-subtotal">${formatearSoles(producto.precio * item.cantidad)}</span>
+        `;
+        listaCarrito.appendChild(li);
+    });
+}
+
+// Un solo "oyente" para todos los botones + − Quitar de la lista
+listaCarrito.addEventListener("click", (evento) => {
+    const boton = evento.target.closest("button[data-accion]");
+    if (!boton) return;
+
+    const { accion, id, talla } = boton.dataset;
+    const item = carrito.find((elemento) => elemento.id === id && elemento.talla === talla);
+    if (!item) return;
+
+    if (accion === "sumar") {
+        item.cantidad = Math.min(item.cantidad + 1, 10);
+    } else if (accion === "restar") {
+        item.cantidad -= 1;
+    } else if (accion === "quitar") {
+        item.cantidad = 0;
+    }
+
+    // Si la cantidad llegó a 0 se elimina del carrito
+    carrito = carrito.filter((elemento) => elemento.cantidad > 0);
+    guardarCarrito();
+    dibujarCarrito();
+});
+
+function abrirCarrito() {
+    mensajeCarrito.textContent = "";
+    panelCarrito.classList.add("abierto");
+    fondoCarrito.classList.add("abierto");
+    panelCarrito.setAttribute("aria-hidden", "false");
+}
+
+function cerrarCarrito() {
+    panelCarrito.classList.remove("abierto");
+    fondoCarrito.classList.remove("abierto");
+    panelCarrito.setAttribute("aria-hidden", "true");
+}
+
+botonCarrito.addEventListener("click", abrirCarrito);
+cerrarCarritoBoton.addEventListener("click", cerrarCarrito);
+fondoCarrito.addEventListener("click", cerrarCarrito);
+document.addEventListener("keydown", (evento) => {
+    if (evento.key === "Escape") cerrarCarrito();
+});
+
+botonVaciarCarrito.addEventListener("click", () => {
+    carrito = [];
+    guardarCarrito();
+    dibujarCarrito();
+});
+
+// Arma el mensaje con TODOS los productos y abre WhatsApp
+function enviarPedidoPorWhatsApp() {
+    const usuario = usuarioActual();
+
+    // Para finalizar la compra pedimos iniciar sesión
+    if (!usuario) {
+        cerrarCarrito();
+        abrirCuenta("login", "Inicia sesión para finalizar tu pedido 🐾");
+        return;
+    }
+
+    const lineas = carrito.map((item) => {
+        const producto = buscarProducto(item.id);
+        return `• ${producto.nombre} | Talla: ${item.talla} | Cant: ${item.cantidad} | ${formatearSoles(producto.precio * item.cantidad)}`;
+    });
+
     const mensaje =
         "Hola, quiero hacer un pedido de la tienda de Misha 🐱\n" +
-        `• Producto: ${productoSeleccionado.nombre}\n` +
-        `• Talla: ${pedidoTalla.value}\n` +
-        `• Cantidad: ${cantidad}\n` +
-        `• Total: ${formatearSoles(total)}\n` +
-        `• A nombre de: ${nombreCliente}\n` +
+        lineas.join("\n") + "\n" +
+        `• Total: ${formatearSoles(calcularTotalCarrito())}\n` +
+        `• A nombre de: ${usuario.nombre} (${usuario.correo})\n` +
         "Te envío la captura de mi pago por Yape.";
 
     const enlace = `https://wa.me/${NUMERO_WHATSAPP}?text=${encodeURIComponent(mensaje)}`;
     window.open(enlace, "_blank", "noopener");
 }
 
-// Solo activamos todo si la sección de productos existe en la página
-if (productosGrid && modalPedido) {
-    crearTarjetasProductos();
-    pedidoCantidad.addEventListener("input", actualizarTotal);
-    botonEnviarPedido.addEventListener("click", enviarPedidoPorWhatsApp);
+botonEnviarPedido.addEventListener("click", enviarPedidoPorWhatsApp);
+
+dibujarCarrito();
+
+// ============================================
+// CUENTA: CREAR CUENTA E INICIAR SESIÓN
+// ============================================
+// IMPORTANTE (para aprender): esto guarda las cuentas en el navegador
+// (localStorage), así que sirve para practicar y para la experiencia de
+// la página. Una tienda real guarda las cuentas en un servidor con base
+// de datos (por ejemplo tu Express) para que sean seguras.
+
+const botonCuenta = document.getElementById("botonCuenta");
+const textoCuenta = document.getElementById("textoCuenta");
+const modalCuenta = document.getElementById("modalCuenta");
+const avisoCuenta = document.getElementById("avisoCuenta");
+const mensajeCuenta = document.getElementById("mensajeCuenta");
+
+const vistaLogin = document.getElementById("vistaLogin");
+const vistaRegistro = document.getElementById("vistaRegistro");
+const vistaSesion = document.getElementById("vistaSesion");
+
+const formLogin = document.getElementById("formLogin");
+const formRegistro = document.getElementById("formRegistro");
+
+// Convierte la contraseña en un código (hash SHA-256) para no guardarla tal cual
+async function hashearClave(clave) {
+    const bytes = new TextEncoder().encode(clave);
+    const resumen = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(resumen))
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
 }
+
+// Devuelve { nombre, correo } si hay sesión iniciada, o null si no
+function usuarioActual() {
+    const correo = leerAlmacen("misha_sesion", null);
+    if (!correo) return null;
+
+    const usuarios = leerAlmacen("misha_usuarios", {});
+    const usuario = usuarios[correo];
+    return usuario ? { nombre: usuario.nombre, correo: correo } : null;
+}
+
+// Cambia el texto del botón de la barra: "Ingresar" o el nombre de la persona
+function actualizarBotonCuenta() {
+    const usuario = usuarioActual();
+    textoCuenta.textContent = usuario ? usuario.nombre.split(" ")[0] : "Ingresar";
+}
+
+// Muestra solo una de las 3 vistas de la ventana
+function mostrarVistaCuenta(nombreVista) {
+    vistaLogin.hidden = nombreVista !== "login";
+    vistaRegistro.hidden = nombreVista !== "registro";
+    vistaSesion.hidden = nombreVista !== "sesion";
+    mensajeCuenta.textContent = "";
+    mensajeCuenta.className = "mensaje-pedido";
+}
+
+function abrirCuenta(vista, aviso) {
+    const usuario = usuarioActual();
+
+    if (usuario) {
+        document.getElementById("nombreUsuario").textContent = usuario.nombre;
+        document.getElementById("correoUsuario").textContent = usuario.correo;
+        mostrarVistaCuenta("sesion");
+    } else {
+        mostrarVistaCuenta(vista || "login");
+    }
+
+    avisoCuenta.textContent = aviso || "";
+    if (!modalCuenta.open) modalCuenta.showModal();
+}
+
+function mensajeEnCuenta(texto, tipo) {
+    mensajeCuenta.textContent = texto;
+    mensajeCuenta.className = "mensaje-pedido " + (tipo || "");
+}
+
+botonCuenta.addEventListener("click", () => abrirCuenta("login"));
+
+document.getElementById("irARegistro").addEventListener("click", (evento) => {
+    evento.preventDefault();
+    mostrarVistaCuenta("registro");
+});
+
+document.getElementById("irALogin").addEventListener("click", (evento) => {
+    evento.preventDefault();
+    mostrarVistaCuenta("login");
+});
+
+// ---- Crear cuenta ----
+formRegistro.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+
+    const nombre = document.getElementById("registroNombre").value.trim();
+    const correo = document.getElementById("registroCorreo").value.trim().toLowerCase();
+    const clave = document.getElementById("registroClave").value;
+    const clave2 = document.getElementById("registroClave2").value;
+
+    if (nombre.length < 2) {
+        mensajeEnCuenta("Escribe tu nombre.");
+        return;
+    }
+    if (!regexCorreo.test(correo)) {
+        mensajeEnCuenta("Ingresa un correo válido.");
+        return;
+    }
+    if (clave.length < 6) {
+        mensajeEnCuenta("La contraseña debe tener al menos 6 caracteres.");
+        return;
+    }
+    if (clave !== clave2) {
+        mensajeEnCuenta("Las contraseñas no coinciden.");
+        return;
+    }
+
+    const usuarios = leerAlmacen("misha_usuarios", {});
+    if (usuarios[correo]) {
+        mensajeEnCuenta("Ese correo ya tiene una cuenta. Inicia sesión.");
+        return;
+    }
+
+    usuarios[correo] = { nombre: nombre, claveHash: await hashearClave(clave) };
+    guardarAlmacen("misha_usuarios", usuarios);
+    guardarAlmacen("misha_sesion", correo);   // iniciamos sesión automáticamente
+
+    formRegistro.reset();
+    actualizarBotonCuenta();
+    modalCuenta.close();
+    mostrarAviso(`¡Bienvenido/a, ${nombre.split(" ")[0]}! 🐱`);
+});
+
+// ---- Iniciar sesión ----
+formLogin.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+
+    const correo = document.getElementById("loginCorreo").value.trim().toLowerCase();
+    const clave = document.getElementById("loginClave").value;
+
+    const usuarios = leerAlmacen("misha_usuarios", {});
+    const usuario = usuarios[correo];
+
+    if (!usuario || usuario.claveHash !== (await hashearClave(clave))) {
+        mensajeEnCuenta("Correo o contraseña incorrectos.");
+        return;
+    }
+
+    guardarAlmacen("misha_sesion", correo);
+    formLogin.reset();
+    actualizarBotonCuenta();
+    modalCuenta.close();
+    mostrarAviso(`¡Hola de nuevo, ${usuario.nombre.split(" ")[0]}! 🐾`);
+});
+
+// ---- Cerrar sesión ----
+document.getElementById("botonCerrarSesion").addEventListener("click", () => {
+    guardarAlmacen("misha_sesion", null);
+    actualizarBotonCuenta();
+    modalCuenta.close();
+    mostrarAviso("Sesión cerrada 👋");
+});
+
+actualizarBotonCuenta();

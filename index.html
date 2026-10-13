@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Misha la gata viral</title>
+    <!-- Ícono de la pestaña: letra M blanca sobre cuadro naranja -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23E07B39'/%3E%3Cpath d='M14 49V16l18 21 18-21v33' fill='none' stroke='white' stroke-width='9' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
@@ -11,17 +13,39 @@
 </head>
 <body>
 
-    <nav class="nav-principal">
-        <a href="#inicio">Inicio</a>
-        <a href="#datos">Datos</a>
-        <a href="#galeria">Galería</a>
-        <a href="#productos">Productos</a>
-        <a href="#donaciones">Donaciones</a>
-        <a href="#suscripcion">Suscríbete</a>
-        <a href="#instagram">Instagram</a>
-    </nav>
+    <!-- BARRA SUPERIOR: marca + menú + cuenta + carrito -->
+    <div class="barra-superior">
+        <a href="#inicio" class="marca">🐾 Misha</a>
 
-    <!-- BACKGROUNDS -->
+        <nav class="nav-principal">
+            <a href="#inicio">Inicio</a>
+            <a href="#datos">Datos</a>
+            <a href="#galeria">Galería</a>
+            <a href="#productos">Productos</a>
+            <a href="#donaciones">Donaciones</a>
+            <a href="#suscripcion">Suscríbete</a>
+            <a href="#instagram">Instagram</a>
+        </nav>
+
+        <div class="barra-acciones">
+            <!-- Botón de cuenta (abre el modal de iniciar sesión / crear cuenta) -->
+            <button type="button" class="icono-boton" id="botonCuenta" aria-label="Mi cuenta">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+                <span id="textoCuenta">Ingresar</span>
+            </button>
+
+            <!-- Botón del carrito con contador y total -->
+            <button type="button" class="icono-boton" id="botonCarrito" aria-label="Abrir carrito">
+                <span class="carrito-icono">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.4a1 1 0 0 0 1 .8h8.8a1 1 0 0 0 1-.8L20 7H6"/></svg>
+                    <span class="contador" id="contadorCarrito">0</span>
+                </span>
+                <strong id="totalCarrito">S/ 0.00</strong>
+            </button>
+        </div>
+    </div>
+
+    <!-- PORTADA -->
     <header class="hero" id="inicio">
         <div class="hero-patch"></div>
         <div class="hero-fotos">
@@ -33,19 +57,43 @@
         <p class="hero-subtitulo">Calicó, dormilona y estrella de la casa 🐾</p>
     </header>
 
-    <!-- DATOS DE MISHA: los cuadros se generan desde funciones.js (arreglo datosMisha) -->
-    <section class="datos" id="datos">
-        <h2>Datos de Misha</h2>
-        <div class="datos-grid" id="datosGrid"></div>
+    <!-- CONOCE A MISHA: foto + historia + etiquetas (las etiquetas se generan desde funciones.js) -->
+    <section class="conoce" id="datos">
+        <div class="conoce-caja">
+            <div class="conoce-foto-caja">
+                <img src="img/misha2.jpeg" alt="Misha, la gata viral" class="conoce-foto">
+            </div>
+
+            <div class="conoce-texto">
+                <h2>Conoce a Misha 🐱</h2>
+                <p>
+                    Misha tiene 1 añito y es la estrella de la casa: todos giran alrededor de ella.
+                    Es calicó, con pelaje blanco, negro y naranja, y aunque es introvertida y se mueve
+                    por la casa sin hacer ruido, es muy cariñosa con toda la familia.
+                </p>
+                <p>
+                    Duerme casi todo el día, y cuando llega la noche sale a explorar, a jugar con su
+                    estrella con cascabel y a hacer su travesura favorita: ¡enredarse con los cables!
+                </p>
+                <ul class="etiquetas" id="etiquetasMisha"></ul>
+            </div>
+        </div>
     </section>
 
-    <!-- COLORES -->
+    <!-- UN DÍA EN LA VIDA DE MISHA: los pasos se generan desde funciones.js (arreglo diaDeMisha) -->
+    <section class="dia" id="dia">
+        <h2>Un día en la vida de Misha</h2>
+        <p class="dia-intro">Así se ve una jornada normal de nuestra gatita viral 🐾</p>
+        <ol class="linea-tiempo" id="lineaTiempo"></ol>
+    </section>
+
+    <!-- GALERÍA: carrusel de varias fotos a la vez (se genera desde funciones.js) -->
     <section class="galeria" id="galeria">
         <h2>Sus momentos favoritos</h2>
         <p class="galeria-ayuda">Desliza con las flechas (o con el dedo) para ver más fotos de Misha.</p>
 
-        <div class="carrusel">
-            <button class="carrusel-flecha carrusel-flecha--izq" id="flechaIzq" aria-label="Foto anterior">&#10094;</button>
+        <div class="carrusel" id="carrusel">
+            <button type="button" class="carrusel-flecha carrusel-flecha--izq" id="flechaIzq" aria-label="Foto anterior">&#10094;</button>
 
             <div class="carrusel-viewport">
                 <div class="carrusel-track" id="carruselTrack">
@@ -53,7 +101,7 @@
                 </div>
             </div>
 
-            <button class="carrusel-flecha carrusel-flecha--der" id="flechaDer" aria-label="Foto siguiente">&#10095;</button>
+            <button type="button" class="carrusel-flecha carrusel-flecha--der" id="flechaDer" aria-label="Foto siguiente">&#10095;</button>
         </div>
 
         <div class="carrusel-indicadores" id="carruselIndicadores"></div>
@@ -63,14 +111,13 @@
     <section class="productos" id="productos">
         <h2>Productos de Misha 🛍️</h2>
         <p class="productos-intro">
-            Polos, gorras y medias con la carita de Misha. ¡Cada compra ayuda con sus croquetas y churus! 🐟
+            Polos, poleras, gorras y medias con la carita de Misha. ¡Cada compra ayuda con sus croquetas y churus! 🐟
         </p>
         <div class="productos-grid" id="productosGrid"></div>
     </section>
 
-    <!-- Ventana emergente para hacer el pedido -->
+    <!-- VENTANA: elegir talla y cantidad para agregar al carrito -->
     <dialog id="modalPedido" class="modal-pedido">
-        <!-- Este formulario solo sirve para cerrar la ventana -->
         <form method="dialog" class="modal-cerrar">
             <button aria-label="Cerrar ventana">✕</button>
         </form>
@@ -79,9 +126,6 @@
         <p id="modalPrecio" class="modal-precio"></p>
 
         <div class="modal-campos">
-            <label>Tu nombre
-                <input type="text" id="pedidoNombre" placeholder="Ej: Ana Pérez">
-            </label>
             <label>Talla
                 <select id="pedidoTalla"></select>
             </label>
@@ -90,37 +134,128 @@
             </label>
         </div>
 
-        <p class="modal-total">Total: <strong id="pedidoTotal"></strong></p>
+        <p class="modal-total">Subtotal: <strong id="pedidoTotal"></strong></p>
 
-        <div class="modal-pago">
-            <p><strong>1)</strong> Paga con Yape escaneando este QR:</p>
-            <img src="img/Qryape.jpeg" alt="Código QR de Yape para pagar tu pedido" class="modal-qr">
-            <p><strong>2)</strong> Envíanos tu pedido y la captura del pago:</p>
-            <button type="button" id="botonEnviarPedido">Enviar pedido por WhatsApp</button>
-            <p id="mensajePedido" class="mensaje-pedido" role="status" aria-live="polite"></p>
-        </div>
+        <button type="button" id="botonAgregarCarrito" class="boton-principal">🛒 Agregar al carrito</button>
+        <p id="mensajePedido" class="mensaje-pedido" role="status" aria-live="polite"></p>
     </dialog>
 
-    <!-- DISEÑO RESPONSIVO WEB -->
-    <!-- MOBILE FIRST -->
-    <!-- DESKTOP FIRST -->
+    <!-- VENTANA: CUENTA (iniciar sesión / crear cuenta / sesión activa) -->
+    <dialog id="modalCuenta" class="modal-pedido modal-cuenta">
+        <form method="dialog" class="modal-cerrar">
+            <button aria-label="Cerrar ventana">✕</button>
+        </form>
 
-    <section class="suscripcion" id="suscripcion">
-        <div class="suscripcion-caja">
-            <h2>No te pierdas nada de Misha</h2>
-            <p>Déjanos tu correo y te avisamos cuando publiquemos una foto o historia nueva.</p>
-            <form id="formSuscripcion" novalidate>
-                <input
-                    type="email"
-                    id="inputCorreo"
-                    name="correo"
-                    placeholder="tu@correo.com"
-                    autocomplete="email"
-                    required
-                >
-                <button type="submit" id="btn">Suscribirme</button>
+        <p id="avisoCuenta" class="aviso-cuenta" role="status"></p>
+
+        <!-- Vista 1: iniciar sesión -->
+        <div id="vistaLogin">
+            <h3 class="modal-titulo">Iniciar sesión</h3>
+            <form id="formLogin" class="form-cuenta" novalidate>
+                <label>Correo
+                    <input type="email" id="loginCorreo" placeholder="tu@correo.com" autocomplete="email" required>
+                </label>
+                <label>Contraseña
+                    <input type="password" id="loginClave" placeholder="Tu contraseña" autocomplete="current-password" required>
+                </label>
+                <button type="submit" class="boton-principal">Iniciar sesión</button>
             </form>
-            <p id="mensajeSuscripcion" class="mensaje-suscripcion" role="status" aria-live="polite"></p>
+            <p class="cambio-vista">¿No tienes cuenta? <a href="#" id="irARegistro">Crear una cuenta</a></p>
+        </div>
+
+        <!-- Vista 2: crear cuenta -->
+        <div id="vistaRegistro" hidden>
+            <h3 class="modal-titulo">Crear cuenta</h3>
+            <form id="formRegistro" class="form-cuenta" novalidate>
+                <label>Nombre
+                    <input type="text" id="registroNombre" placeholder="Ej: Ana Pérez" autocomplete="name" required>
+                </label>
+                <label>Correo
+                    <input type="email" id="registroCorreo" placeholder="tu@correo.com" autocomplete="email" required>
+                </label>
+                <label>Contraseña (mínimo 6 caracteres)
+                    <input type="password" id="registroClave" autocomplete="new-password" required>
+                </label>
+                <label>Repite la contraseña
+                    <input type="password" id="registroClave2" autocomplete="new-password" required>
+                </label>
+                <button type="submit" class="boton-principal">Crear mi cuenta</button>
+            </form>
+            <p class="cambio-vista">¿Ya tienes cuenta? <a href="#" id="irALogin">Inicia sesión</a></p>
+        </div>
+
+        <!-- Vista 3: sesión activa -->
+        <div id="vistaSesion" hidden>
+            <h3 class="modal-titulo">¡Hola, <span id="nombreUsuario"></span>! 🐱</h3>
+            <p id="correoUsuario"></p>
+            <button type="button" id="botonCerrarSesion" class="boton-principal">Cerrar sesión</button>
+        </div>
+
+        <p id="mensajeCuenta" class="mensaje-pedido" role="status" aria-live="polite"></p>
+    </dialog>
+
+    <!-- CARRITO: panel lateral -->
+    <div class="carrito-fondo" id="fondoCarrito"></div>
+    <aside class="carrito-panel" id="panelCarrito" aria-label="Carrito de compras" aria-hidden="true">
+        <div class="carrito-cabecera">
+            <h3>🛒 Tu carrito</h3>
+            <button type="button" class="carrito-cerrar" id="cerrarCarrito" aria-label="Cerrar carrito">✕</button>
+        </div>
+
+        <p class="carrito-vacio" id="carritoVacio">Tu carrito está vacío 😿<br>¡Agrega algo para Misha!</p>
+
+        <ul class="carrito-lista" id="listaCarrito"></ul>
+
+        <div class="carrito-pie" id="carritoPie">
+            <p class="carrito-total">Total: <strong id="carritoTotal">S/ 0.00</strong></p>
+
+            <div class="carrito-pago">
+                <p><strong>1)</strong> Paga con Yape escaneando este QR:</p>
+                <img src="img/Qryape.jpeg" alt="Código QR de Yape para pagar tu pedido" class="modal-qr">
+                <p><strong>2)</strong> Envíanos tu pedido y la captura del pago:</p>
+                <button type="button" id="botonEnviarPedido" class="boton-principal">Enviar pedido por WhatsApp</button>
+                <button type="button" id="botonVaciarCarrito" class="boton-secundario">Vaciar carrito</button>
+                <p id="mensajeCarrito" class="mensaje-pedido" role="status" aria-live="polite"></p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Aviso flotante (ej: "Agregado al carrito") -->
+    <div class="aviso-flotante" id="avisoFlotante" role="status" aria-live="polite"></div>
+
+    <!-- SUSCRIPCIÓN: banner con foto a la izquierda y formulario a la derecha -->
+    <section class="suscripcion" id="suscripcion">
+        <div class="suscripcion-banner">
+            <div class="suscripcion-foto-caja">
+                <!-- Copia difuminada que rellena los costados -->
+                <img src="img/Misha4.jpeg" alt="" aria-hidden="true" class="suscripcion-foto-fondo">
+                <!-- Foto principal: se ve completa y centrada -->
+                <img src="img/Misha4.jpeg" alt="Misha, la gata viral" class="suscripcion-foto">
+            </div>
+
+            <div class="suscripcion-contenido">
+                <h2>¿Quieres recibir información y notificaciones de Misha? ¡Coloca tu email! 🐾</h2>
+                <p>Únete a la comunidad de Misha y sé el primero en enterarte de sus nuevas fotos, historias, productos y sorpresas.</p>
+
+                <form id="formSuscripcion" novalidate>
+                    <input
+                        type="email"
+                        id="inputCorreo"
+                        name="correo"
+                        placeholder="Email"
+                        autocomplete="email"
+                        required
+                    >
+                    <button type="submit" id="btn">¡Únete!</button>
+
+                    <label class="suscripcion-check">
+                        <input type="checkbox" id="aceptoPrivacidad">
+                        <span>He leído y acepto la <strong>Política de privacidad</strong> y deseo recibir notificaciones de Misha.</span>
+                    </label>
+                </form>
+
+                <p id="mensajeSuscripcion" class="mensaje-suscripcion" role="status" aria-live="polite"></p>
+            </div>
         </div>
     </section>
 
@@ -136,7 +271,7 @@
         </a>
     </section>
 
-    <!-- ===== SEGUNDA PARTE DE LA PÁGINA: DONACIONES ===== -->
+    <!-- DONACIONES -->
     <section class="donaciones" id="donaciones">
         <h2>Ayuda con sus croquetas y churus 🐟</h2>
         <p class="donaciones-intro">
@@ -146,7 +281,6 @@
         </p>
 
         <div class="donaciones-grid">
-            <!-- Única tarjeta: solo el QR de Yape -->
             <div class="donaciones-tarjeta donaciones-tarjeta--qr">
                 <img src="img/Qryape.jpeg" alt="Código QR de Yape para donar a Misha" class="donaciones-qr">
                 <p class="donaciones-etiqueta">Escanea con Yape</p>
