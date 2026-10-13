@@ -209,10 +209,9 @@ const datosMisha = [
     { emoji: "🎨", titulo: "Pelaje calicó", descripcion: "Mezcla blanco, negro y naranja en un solo gatito." },
     { emoji: "⭐", titulo: "Estrella de la casa", descripcion: "Todos giran alrededor de ella." },
     { emoji: "📸", titulo: "Viral en Instagram", descripcion: "La encuentras como @misha.gataviral." },
-    // ✏️ EDITA estos 3 con datos reales de Misha:
-    { emoji: "📍", titulo: "Su lugar favorito", descripcion: "✏️ Cuéntanos dónde le gusta descansar." },
-    { emoji: "🧸", titulo: "Su juguete favorito", descripcion: "✏️ Escribe con qué juega más." },
-    { emoji: "🌙", titulo: "Sus noches", descripcion: "✏️ Escribe qué hace Misha de noche." },
+    { emoji: "📍", titulo: "Su lugar favorito", descripcion: "Dormir en cualquier parte de casa" },
+    { emoji: "🧸", titulo: "Su juguete favorito", descripcion: "Estrella con cascabel" },
+    { emoji: "🌙", titulo: "Sus noches", descripcion: "Juega y explorar toda la casa" },
 ];
 
 const datosGrid = document.getElementById("datosGrid");
