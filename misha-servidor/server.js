@@ -2,9 +2,11 @@
 // server.js - Servidor de Misha (Express + SQLite)
 // ============================================
 
+require("dotenv").config();            // 🆕 carga las variables del archivo .env
 const express = require("express");
 const cors = require("cors");
-const bcrypt = require("bcryptjs");    // 🆕 para convertir contraseñas en hash
+const bcrypt = require("bcryptjs");    // para convertir contraseñas en hash
+const jwt = require("jsonwebtoken");   // 🆕 para crear y revisar los tokens de sesión
 const baseDeDatos = require("./db");   // nuestra conexión a SQLite (db.js)
 
 const aplicacion = express();
@@ -102,6 +104,106 @@ aplicacion.post("/api/registro", async (peticion, respuesta) => {
         console.error("Error al registrar el usuario:", error);
         return respuesta.status(500).json({ mensaje: "Ocurrió un error en el servidor 😿" });
     }
+});
+
+// ============================================
+// 🆕 LOGIN Y SESIÓN (JWT)
+// ============================================
+// Un JWT (JSON Web Token) es una credencial con 3 partes: encabezado, datos y firma.
+// - Los datos (nombre, correo...) se pueden LEER, no van cifrados:
+//   por eso NUNCA metas contraseñas dentro del token.
+// - La firma se crea con nuestro secreto: si alguien cambia un solo dato
+//   del token, la firma ya no coincide y el servidor lo rechaza.
+
+// El secreto vive en el archivo .env (que NO se sube a GitHub)
+const JWT_SECRETO = process.env.JWT_SECRETO;
+
+if (!JWT_SECRETO) {
+    console.error("Falta JWT_SECRETO en el archivo .env. Revisa el paso 3.");
+    process.exit(1);
+}
+
+const buscarUsuarioPorCorreo = baseDeDatos.prepare(
+    "SELECT id, nombre, correo, clave_hash FROM usuarios WHERE correo = ?"
+);
+
+const buscarUsuarioPorId = baseDeDatos.prepare(
+    "SELECT id, nombre, correo FROM usuarios WHERE id = ?"
+);
+
+// Hash de mentira: si el correo no existe, igual hacemos una comparación con este.
+// Así el servidor tarda parecido en los dos casos y no revela qué correos existen.
+const HASH_FALSO = bcrypt.hashSync("clave-falsa-para-igualar-tiempos", COSTO_BCRYPT);
+
+// ---- POST /api/login ----
+// La página envía: { correo, clave }
+aplicacion.post("/api/login", async (peticion, respuesta) => {
+    const correo = String(peticion.body.correo || "").trim().toLowerCase();
+    const clave = String(peticion.body.clave || "");
+
+    try {
+        // 1) Buscamos al usuario (devuelve undefined si no existe)
+        const usuario = buscarUsuarioPorCorreo.get(correo);
+
+        // 2) bcrypt compara la contraseña escrita con el hash guardado
+        const claveCorrecta = await bcrypt.compare(
+            clave,
+            usuario ? usuario.clave_hash : HASH_FALSO
+        );
+
+        // 3) Mismo mensaje para "correo no existe" y "contraseña incorrecta"
+        if (!usuario || !claveCorrecta) {
+            return respuesta.status(401).json({ mensaje: "Correo o contraseña incorrectos." });
+        }
+
+        // 4) Creamos el token: guarda el id y vence en 7 días
+        const token = jwt.sign({ id: usuario.id }, JWT_SECRETO, { expiresIn: "7d" });
+
+        return respuesta.json({
+            mensaje: `¡Hola de nuevo, ${usuario.nombre.split(" ")[0]}! 🐾`,
+            token: token,
+            usuario: { nombre: usuario.nombre, correo: usuario.correo },
+        });
+    } catch (error) {
+        console.error("Error en el login:", error);
+        return respuesta.status(500).json({ mensaje: "Ocurrió un error en el servidor 😿" });
+    }
+});
+
+// ---- Middleware: "portero" para las rutas que exigen sesión ----
+// La página manda el token en el encabezado:  Authorization: Bearer <token>
+function exigirSesion(peticion, respuesta, siguiente) {
+    const encabezado = peticion.headers.authorization || "";
+    const [tipo, token] = encabezado.split(" ");
+
+    if (tipo !== "Bearer" || !token) {
+        return respuesta.status(401).json({ mensaje: "Debes iniciar sesión." });
+    }
+
+    try {
+        // verify() revisa la firma y la fecha de vencimiento
+        const datos = jwt.verify(token, JWT_SECRETO, { algorithms: ["HS256"] });
+
+        // Volvemos a buscar al usuario: si ya no existe, el token no sirve
+        const usuario = buscarUsuarioPorId.get(datos.id);
+        if (!usuario) {
+            return respuesta.status(401).json({ mensaje: "Debes iniciar sesión." });
+        }
+
+        peticion.usuario = usuario;   // lo dejamos disponible para la ruta
+        siguiente();                  // pasa al siguiente paso
+    } catch (error) {
+        return respuesta.status(401).json({ mensaje: "Tu sesión expiró. Inicia sesión de nuevo." });
+    }
+}
+
+// ---- GET /api/perfil ----
+// Ruta protegida: solo responde si llega un token válido.
+// La página la usará al cargar para saber si la persona sigue con sesión.
+aplicacion.get("/api/perfil", exigirSesion, (peticion, respuesta) => {
+    respuesta.json({
+        usuario: { nombre: peticion.usuario.nombre, correo: peticion.usuario.correo },
+    });
 });
 
 aplicacion.listen(PUERTO, () => {
