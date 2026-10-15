@@ -777,6 +777,7 @@ button:hover {
     align-items: center;
     justify-content: center;
     font-size: 4rem;
+    cursor: zoom-in;          /* 🆕 la foto se puede ampliar con clic */
 }
 
 .producto-foto img {
@@ -805,6 +806,54 @@ button:hover {
     margin: 0;
     font-weight: 700;
     color: var(--jengibre);
+    font-size: 1.1rem;
+}
+
+/* ===== 🆕 FOTO DEL PRODUCTO EN GRANDE (se ve completa, sin cortes) ===== */
+
+.modal-imagen {
+    border: none;
+    padding: 0;
+    background: transparent;
+    max-width: 96vw;
+    max-height: 96vh;
+    overflow: visible;
+    text-align: center;
+}
+
+.modal-imagen::backdrop {
+    background: rgba(0, 0, 0, 0.85);
+}
+
+/* object-fit: contain = la imagen se ve COMPLETA, sin recortes */
+.modal-imagen img {
+    display: block;
+    max-width: 92vw;
+    max-height: 80vh;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    margin: 0 auto;
+    border-radius: 12px;
+}
+
+.modal-imagen-pie {
+    margin: 12px 0 0;
+    color: var(--crema);
+    font-weight: 700;
+}
+
+.modal-imagen-cerrar {
+    position: absolute;
+    top: -14px;
+    right: -6px;
+    z-index: 1;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 50%;
+    background-color: var(--chocolate);
+    color: var(--crema);
     font-size: 1.1rem;
 }
 

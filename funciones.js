@@ -322,14 +322,37 @@ const productosMisha = [
     { id: "polo3",    nombre: "Polo Misha 3",    categoria: "Polo",    precio: 35, imagen: "img/polo3.jpg",    tallas: ["S", "M", "L", "XL"] },
     { id: "polera1",  nombre: "Polera Misha 1",  categoria: "Polera",  precio: 60, imagen: "img/polera1.jpg",  tallas: ["S", "M", "L", "XL"] },
     { id: "polera2",  nombre: "Polera Misha 2",  categoria: "Polera",  precio: 60, imagen: "img/polera2.jpg",  tallas: ["S", "M", "L", "XL"] },
+
+    // 🆕 Suéteres nuevos
+    { id: "sueter1",  nombre: "Suéter Misha 1",  categoria: "Sueter",  precio: 70, imagen: "img/sueter1.jpg",  tallas: ["S", "M", "L", "XL"] },
+    { id: "sueter2",  nombre: "Suéter Misha 2",  categoria: "Sueter",  precio: 70, imagen: "img/sueter2.jpg",  tallas: ["S", "M", "L", "XL"] },
+
     { id: "gorra1",   nombre: "Gorra Misha 1",   categoria: "Gorra",   precio: 25, imagen: "img/gorra1.jpg",   tallas: ["Única"] },
     { id: "gorra2",   nombre: "Gorra Misha 2",   categoria: "Gorra",   precio: 25, imagen: "img/gorra2.jpg",   tallas: ["Única"] },
+
+    // 🆕 Bolsas nuevas (talla única)
+    { id: "bolsa1",   nombre: "Bolsa Misha 1",   categoria: "Bolsa",   precio: 20, imagen: "img/bolsa1.jpg",   tallas: ["Única"] },
+    { id: "bolsa2",   nombre: "Bolsa Misha 2",   categoria: "Bolsa",   precio: 20, imagen: "img/bolsa2.jpg",   tallas: ["Única"] },
+
     { id: "medias1",  nombre: "Medias Misha 1",  categoria: "Medias",  precio: 10, imagen: "img/medias1.jpg",  tallas: ["35-39", "40-44"] },
     { id: "medias2",  nombre: "Medias Misha 2",  categoria: "Medias",  precio: 10, imagen: "img/medias2.jpg",  tallas: ["35-39", "40-44"] },
+
+    // 🆕 Tazas nuevas (talla única)
+    { id: "taza1",    nombre: "Taza Misha 1",    categoria: "Taza",    precio: 15, imagen: "img/taza1.jpg",    tallas: ["Única"] },
+    { id: "taza2",    nombre: "Taza Misha 2",    categoria: "Taza",    precio: 15, imagen: "img/taza2.jpg",    tallas: ["Única"] },
 ];
 
-// Emoji de relleno que se ve mientras no subas las fotos reales
-const emojiPorCategoria = { Polo: "👕", Polera: "🧥", Gorra: "🧢", Medias: "🧦" };
+// Emoji de relleno que se ve mientras no subas las fotos reales.
+// Cada categoría nueva necesita su emoji aquí, si no saldría "undefined".
+const emojiPorCategoria = {
+    Polo: "👕",
+    Polera: "🧥",
+    Sueter: "🧶",   // 🆕
+    Gorra: "🧢",
+    Bolsa: "👜",    // 🆕
+    Medias: "🧦",
+    Taza: "☕",     // 🆕
+};
 
 const productosGrid = document.getElementById("productosGrid");
 const modalPedido = document.getElementById("modalPedido");
@@ -340,6 +363,21 @@ const pedidoCantidad = document.getElementById("pedidoCantidad");
 const pedidoTotal = document.getElementById("pedidoTotal");
 const botonAgregarCarrito = document.getElementById("botonAgregarCarrito");
 const mensajePedido = document.getElementById("mensajePedido");
+
+// 🆕 Ventana para ver la foto del producto completa (sin cortes)
+const modalImagen = document.getElementById("modalImagen");
+const imagenGrande = document.getElementById("imagenGrande");
+const pieImagen = document.getElementById("pieImagen");
+
+function abrirImagenGrande(producto) {
+    imagenGrande.src = producto.imagen;
+    imagenGrande.alt = producto.nombre;
+    pieImagen.textContent = `${producto.nombre} · ${formatearSoles(producto.precio)}`;
+    modalImagen.showModal();
+}
+
+// Un clic en cualquier parte de la ventana la cierra (la tecla Esc también)
+modalImagen.addEventListener("click", () => modalImagen.close());
 
 // Producto que la persona eligió en este momento
 let productoSeleccionado = null;
@@ -365,6 +403,11 @@ function crearTarjetasProductos() {
         imagen.loading = "lazy";
         imagen.addEventListener("error", () => imagen.remove());
         cajaFoto.appendChild(imagen);
+
+        // 🆕 Clic en la foto = verla completa (solo si la imagen sí cargó)
+        cajaFoto.addEventListener("click", () => {
+            if (imagen.isConnected) abrirImagenGrande(producto);
+        });
 
         const info = document.createElement("div");
         info.className = "producto-info";
