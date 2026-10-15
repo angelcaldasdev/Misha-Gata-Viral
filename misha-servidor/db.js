@@ -22,5 +22,18 @@ baseDeDatos.exec(`
     )
 `);
 
+// 🆕 Tabla "usuarios": las personas que crean una cuenta para comprar.
+// - clave_hash: NUNCA guardamos la contraseña real, solo un código (hash)
+//   que se genera con bcrypt y no se puede convertir de vuelta en la contraseña.
+baseDeDatos.exec(`
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        correo TEXT NOT NULL UNIQUE,
+        clave_hash TEXT NOT NULL,
+        fecha_registro TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+`);
+
 // Exportamos la conexión para usarla en server.js
 module.exports = baseDeDatos;
