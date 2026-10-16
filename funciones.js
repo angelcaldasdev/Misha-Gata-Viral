@@ -645,12 +645,11 @@ botonEnviarPedido.addEventListener("click", enviarPedidoPorWhatsApp);
 dibujarCarrito();
 
 // ============================================
-// CUENTA: CREAR CUENTA E INICIAR SESIÓN
+// CUENTA: CREAR CUENTA E INICIAR SESIÓN (conectada al servidor Express)
 // ============================================
-// IMPORTANTE (para aprender): esto guarda las cuentas en el navegador
-// (localStorage), así que sirve para practicar y para la experiencia de
-// la página. Una tienda real guarda las cuentas en un servidor con base
-// de datos (por ejemplo tu Express) para que sean seguras.
+// Ahora las cuentas viven en la base de datos del servidor (SQLite) y las
+// contraseñas se guardan con bcrypt. En el navegador solo guardamos el TOKEN
+// de sesión (JWT) que nos entrega el servidor cuando iniciamos sesión.
 
 const botonCuenta = document.getElementById("botonCuenta");
 const textoCuenta = document.getElementById("textoCuenta");
@@ -665,29 +664,58 @@ const vistaSesion = document.getElementById("vistaSesion");
 const formLogin = document.getElementById("formLogin");
 const formRegistro = document.getElementById("formRegistro");
 
-// Convierte la contraseña en un código (hash SHA-256) para no guardarla tal cual
-async function hashearClave(clave) {
-    const bytes = new TextEncoder().encode(clave);
-    const resumen = await crypto.subtle.digest("SHA-256", bytes);
-    return Array.from(new Uint8Array(resumen))
-        .map((byte) => byte.toString(16).padStart(2, "0"))
-        .join("");
+// Nombre con el que guardamos el token en el navegador (localStorage)
+const CLAVE_TOKEN = "misha_token";
+
+// Datos de la persona con sesión iniciada: { nombre, correo }, o null si no hay sesión
+let usuarioSesion = null;
+
+// Habla con el servidor y SIEMPRE devuelve { ok, datos, sinConexion }
+//  - ok: true si el servidor respondió con éxito
+//  - datos: el JSON que respondió el servidor (ej: { mensaje: "..." })
+//  - sinConexion: true si no se pudo llegar al servidor (apagado o sin internet)
+async function pedirAlServidor(ruta, metodo, cuerpo, token) {
+    const encabezados = { "Content-Type": "application/json" };
+
+    // Si hay token, lo enviamos para que el servidor sepa quiénes somos
+    if (token) {
+        encabezados["Authorization"] = `Bearer ${token}`;
+    }
+
+    try {
+        const respuesta = await fetch(`${URL_SERVIDOR}${ruta}`, {
+            method: metodo,
+            headers: encabezados,
+            body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+        });
+
+        const datos = await respuesta.json();
+        return { ok: respuesta.ok, datos: datos, sinConexion: false };
+    } catch (error) {
+        return {
+            ok: false,
+            datos: { mensaje: "No se pudo conectar con el servidor 😿" },
+            sinConexion: true,
+        };
+    }
 }
 
 // Devuelve { nombre, correo } si hay sesión iniciada, o null si no
+// (el carrito usa esta función para pedir iniciar sesión antes de enviar el pedido)
 function usuarioActual() {
-    const correo = leerAlmacen("misha_sesion", null);
-    if (!correo) return null;
+    return usuarioSesion;
+}
 
-    const usuarios = leerAlmacen("misha_usuarios", {});
-    const usuario = usuarios[correo];
-    return usuario ? { nombre: usuario.nombre, correo: correo } : null;
+// Guarda el token y los datos de la persona después de iniciar sesión
+function guardarSesion(datosLogin) {
+    guardarAlmacen(CLAVE_TOKEN, datosLogin.token);
+    usuarioSesion = datosLogin.usuario;
+    actualizarBotonCuenta();
 }
 
 // Cambia el texto del botón de la barra: "Ingresar" o el nombre de la persona
 function actualizarBotonCuenta() {
-    const usuario = usuarioActual();
-    textoCuenta.textContent = usuario ? usuario.nombre.split(" ")[0] : "Ingresar";
+    textoCuenta.textContent = usuarioSesion ? usuarioSesion.nombre.split(" ")[0] : "Ingresar";
 }
 
 // Muestra solo una de las 3 vistas de la ventana
@@ -740,6 +768,7 @@ formRegistro.addEventListener("submit", async (evento) => {
     const clave = document.getElementById("registroClave").value;
     const clave2 = document.getElementById("registroClave2").value;
 
+    // 1) Validaciones rápidas en la página (el servidor las vuelve a hacer)
     if (nombre.length < 2) {
         mensajeEnCuenta("Escribe tu nombre.");
         return;
@@ -757,20 +786,34 @@ formRegistro.addEventListener("submit", async (evento) => {
         return;
     }
 
-    const usuarios = leerAlmacen("misha_usuarios", {});
-    if (usuarios[correo]) {
-        mensajeEnCuenta("Ese correo ya tiene una cuenta. Inicia sesión.");
+    // 2) Desactivamos el botón para evitar envíos dobles
+    const botonEnviar = formRegistro.querySelector('button[type="submit"]');
+    botonEnviar.disabled = true;
+    mensajeEnCuenta("Creando tu cuenta...");
+
+    // 3) Le pedimos al servidor que cree la cuenta
+    const registro = await pedirAlServidor("/api/registro", "POST", { nombre, correo, clave });
+
+    if (!registro.ok) {
+        mensajeEnCuenta(registro.datos.mensaje);
+        botonEnviar.disabled = false;
         return;
     }
 
-    usuarios[correo] = { nombre: nombre, claveHash: await hashearClave(clave) };
-    guardarAlmacen("misha_usuarios", usuarios);
-    guardarAlmacen("misha_sesion", correo);   // iniciamos sesión automáticamente
+    // 4) La cuenta ya existe: iniciamos sesión automáticamente para recibir el token
+    const login = await pedirAlServidor("/api/login", "POST", { correo, clave });
+    botonEnviar.disabled = false;
 
+    if (!login.ok) {
+        mostrarVistaCuenta("login");
+        mensajeEnCuenta("Tu cuenta fue creada. Inicia sesión para continuar.", "exito");
+        return;
+    }
+
+    guardarSesion(login.datos);
     formRegistro.reset();
-    actualizarBotonCuenta();
     modalCuenta.close();
-    mostrarAviso(`¡Bienvenido/a, ${nombre.split(" ")[0]}! 🐱`);
+    mostrarAviso(`¡Bienvenido/a, ${login.datos.usuario.nombre.split(" ")[0]}! 🐱`);
 });
 
 // ---- Iniciar sesión ----
@@ -780,27 +823,59 @@ formLogin.addEventListener("submit", async (evento) => {
     const correo = document.getElementById("loginCorreo").value.trim().toLowerCase();
     const clave = document.getElementById("loginClave").value;
 
-    const usuarios = leerAlmacen("misha_usuarios", {});
-    const usuario = usuarios[correo];
-
-    if (!usuario || usuario.claveHash !== (await hashearClave(clave))) {
-        mensajeEnCuenta("Correo o contraseña incorrectos.");
+    if (!regexCorreo.test(correo) || clave.length === 0) {
+        mensajeEnCuenta("Escribe tu correo y tu contraseña.");
         return;
     }
 
-    guardarAlmacen("misha_sesion", correo);
+    const botonEnviar = formLogin.querySelector('button[type="submit"]');
+    botonEnviar.disabled = true;
+    mensajeEnCuenta("Iniciando sesión...");
+
+    // El servidor compara la contraseña con el hash guardado y nos da un token
+    const login = await pedirAlServidor("/api/login", "POST", { correo, clave });
+    botonEnviar.disabled = false;
+
+    if (!login.ok) {
+        mensajeEnCuenta(login.datos.mensaje);
+        return;
+    }
+
+    guardarSesion(login.datos);
     formLogin.reset();
-    actualizarBotonCuenta();
     modalCuenta.close();
-    mostrarAviso(`¡Hola de nuevo, ${usuario.nombre.split(" ")[0]}! 🐾`);
+    mostrarAviso(login.datos.mensaje);
 });
 
 // ---- Cerrar sesión ----
+// Borramos el token del navegador y listo
 document.getElementById("botonCerrarSesion").addEventListener("click", () => {
-    guardarAlmacen("misha_sesion", null);
+    guardarAlmacen(CLAVE_TOKEN, null);
+    usuarioSesion = null;
     actualizarBotonCuenta();
     modalCuenta.close();
     mostrarAviso("Sesión cerrada 👋");
 });
 
+// ---- Recordar la sesión al recargar la página ----
+// Si hay un token guardado, se lo mostramos al servidor (/api/perfil)
+// para confirmar que sigue siendo válido y recuperar el nombre.
+async function restaurarSesion() {
+    const token = leerAlmacen(CLAVE_TOKEN, null);
+    if (!token) return;
+
+    const resultado = await pedirAlServidor("/api/perfil", "GET", null, token);
+
+    if (resultado.ok) {
+        usuarioSesion = resultado.datos.usuario;
+    } else if (!resultado.sinConexion) {
+        // El servidor sí respondió pero el token ya no sirve (venció o es falso): lo borramos
+        guardarAlmacen(CLAVE_TOKEN, null);
+    }
+    // Si el servidor estaba apagado, conservamos el token para el próximo intento
+
+    actualizarBotonCuenta();
+}
+
 actualizarBotonCuenta();
+restaurarSesion();
