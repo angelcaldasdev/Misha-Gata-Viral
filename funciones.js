@@ -613,8 +613,8 @@ botonVaciarCarrito.addEventListener("click", () => {
     dibujarCarrito();
 });
 
-// Arma el mensaje con TODOS los productos y abre WhatsApp
-function enviarPedidoPorWhatsApp() {
+// Guarda el pedido en el servidor y, si sale bien, abre WhatsApp con el resumen
+async function enviarPedidoPorWhatsApp() {
     const usuario = usuarioActual();
 
     // Para finalizar la compra pedimos iniciar sesión
@@ -624,20 +624,74 @@ function enviarPedidoPorWhatsApp() {
         return;
     }
 
-    const lineas = carrito.map((item) => {
-        const producto = buscarProducto(item.id);
-        return `• ${producto.nombre} | Talla: ${item.talla} | Cant: ${item.cantidad} | ${formatearSoles(producto.precio * item.cantidad)}`;
+    // Abrimos la pestaña de WhatsApp AHORA, mientras dura el clic de la persona.
+    // Si esperáramos a que responda el servidor, muchos navegadores (sobre todo
+    // en celulares) la bloquearían como ventana emergente. Más abajo le ponemos el enlace.
+    const ventanaWhatsApp = window.open("", "_blank");
+
+    botonEnviarPedido.disabled = true;
+    mensajeCarrito.textContent = "Guardando tu pedido...";
+
+    // Enviamos SOLO id, talla y cantidad: el servidor pone los precios y calcula el total
+    const itemsDelPedido = carrito.map((item) => ({
+        id: item.id,
+        talla: item.talla,
+        cantidad: item.cantidad,
+    }));
+
+    const token = leerAlmacen(CLAVE_TOKEN, null);
+    const resultado = await pedirAlServidor("/api/pedidos", "POST", { items: itemsDelPedido }, token);
+    botonEnviarPedido.disabled = false;
+
+    // ---- Si algo salió mal, cerramos la pestaña en blanco y avisamos ----
+    if (!resultado.ok) {
+        if (ventanaWhatsApp) ventanaWhatsApp.close();
+
+        // 401 = el token venció o ya no es válido: hay que iniciar sesión otra vez
+        if (resultado.estado === 401) {
+            guardarAlmacen(CLAVE_TOKEN, null);
+            usuarioSesion = null;
+            actualizarBotonCuenta();
+            cerrarCarrito();
+            abrirCuenta("login", "Tu sesión expiró. Inicia sesión de nuevo 🐾");
+            return;
+        }
+
+        mensajeCarrito.textContent = resultado.datos.mensaje;
+        return;
+    }
+
+    // ---- El pedido ya está guardado: armamos el mensaje con los datos del SERVIDOR ----
+    const pedido = resultado.datos.pedido;
+
+    const lineas = pedido.items.map((item) => {
+        return `• ${item.nombre} | Talla: ${item.talla} | Cant: ${item.cantidad} | ${formatearSoles(item.subtotal)}`;
     });
 
     const mensaje =
-        "Hola, quiero hacer un pedido de la tienda de Misha 🐱\n" +
+        `Hola, quiero confirmar mi pedido N.º ${pedido.id} de la tienda de Misha\n` +
         lineas.join("\n") + "\n" +
-        `• Total: ${formatearSoles(calcularTotalCarrito())}\n` +
+        `• Total: ${formatearSoles(pedido.total)}\n` +
         `• A nombre de: ${usuario.nombre} (${usuario.correo})\n` +
         "Te envío la captura de mi pago por Yape.";
 
     const enlace = `https://wa.me/${NUMERO_WHATSAPP}?text=${encodeURIComponent(mensaje)}`;
-    window.open(enlace, "_blank", "noopener");
+
+    // El pedido quedó registrado: vaciamos el carrito para no enviarlo dos veces
+    carrito = [];
+    guardarCarrito();
+    dibujarCarrito();
+    mensajeCarrito.textContent = "";
+    cerrarCarrito();
+    mostrarAviso(`Pedido N.º ${pedido.id} registrado ✅`);
+
+    // Lo último: llevamos la pestaña a WhatsApp (si el navegador la bloqueó, usamos esta misma)
+    if (ventanaWhatsApp) {
+        ventanaWhatsApp.opener = null;
+        ventanaWhatsApp.location.href = enlace;
+    } else {
+        window.location.href = enlace;
+    }
 }
 
 botonEnviarPedido.addEventListener("click", enviarPedidoPorWhatsApp);
@@ -690,10 +744,11 @@ async function pedirAlServidor(ruta, metodo, cuerpo, token) {
         });
 
         const datos = await respuesta.json();
-        return { ok: respuesta.ok, datos: datos, sinConexion: false };
+        return { ok: respuesta.ok, estado: respuesta.status, datos: datos, sinConexion: false };
     } catch (error) {
         return {
             ok: false,
+            estado: 0,
             datos: { mensaje: "No se pudo conectar con el servidor 😿" },
             sinConexion: true,
         };

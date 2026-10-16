@@ -8,6 +8,7 @@ const cors = require("cors");
 const bcrypt = require("bcryptjs");    // para convertir contraseñas en hash
 const jwt = require("jsonwebtoken");   // 🆕 para crear y revisar los tokens de sesión
 const baseDeDatos = require("./db");   // nuestra conexión a SQLite (db.js)
+const { catalogoPorId } = require("./productos");   // 🆕 precios oficiales (productos.js)
 
 const aplicacion = express();
 const PUERTO = 3000;
@@ -204,6 +205,104 @@ aplicacion.get("/api/perfil", exigirSesion, (peticion, respuesta) => {
     respuesta.json({
         usuario: { nombre: peticion.usuario.nombre, correo: peticion.usuario.correo },
     });
+});
+
+// ============================================
+// 🆕 PEDIDOS
+// ============================================
+
+const insertarPedido = baseDeDatos.prepare(
+    "INSERT INTO pedidos (usuario_id, total_centimos) VALUES (?, ?)"
+);
+
+const insertarDetalle = baseDeDatos.prepare(`
+    INSERT INTO detalle_pedido (pedido_id, producto_id, nombre, talla, cantidad, precio_centimos)
+    VALUES (?, ?, ?, ?, ?, ?)
+`);
+
+// Una "transacción" agrupa varias escrituras: o se guardan TODAS o no se guarda NINGUNA.
+// Así nunca queda un pedido a medias (por ejemplo, el pedido sin sus productos).
+const guardarPedido = baseDeDatos.transaction((usuarioId, lineas, totalCentimos) => {
+    const resultado = insertarPedido.run(usuarioId, totalCentimos);
+    const pedidoId = resultado.lastInsertRowid;   // el id que SQLite le asignó al pedido
+
+    for (const linea of lineas) {
+        insertarDetalle.run(
+            pedidoId,
+            linea.productoId,
+            linea.nombre,
+            linea.talla,
+            linea.cantidad,
+            linea.precioCentimos
+        );
+    }
+
+    return pedidoId;
+});
+
+// ---- POST /api/pedidos ----
+// Ruta protegida (exigirSesion). La página envía SOLO lo que la persona eligió:
+//   { items: [ { id: "polo1", talla: "M", cantidad: 2 }, ... ] }
+// Los precios y el total los pone el servidor.
+aplicacion.post("/api/pedidos", exigirSesion, (peticion, respuesta) => {
+    const itemsRecibidos = peticion.body.items;
+
+    if (!Array.isArray(itemsRecibidos) || itemsRecibidos.length === 0) {
+        return respuesta.status(400).json({ mensaje: "Tu carrito está vacío." });
+    }
+    if (itemsRecibidos.length > 50) {
+        return respuesta.status(400).json({ mensaje: "Hay demasiados productos en el pedido." });
+    }
+
+    // Revisamos cada producto contra el catálogo y vamos sumando el total
+    const lineas = [];
+    let totalCentimos = 0;
+
+    for (const item of itemsRecibidos) {
+        const producto = catalogoPorId.get(String(item.id));
+        const cantidad = Number(item.cantidad);
+
+        if (!producto) {
+            return respuesta.status(400).json({ mensaje: "Hay un producto que ya no está disponible." });
+        }
+        if (!producto.tallas.includes(item.talla)) {
+            return respuesta.status(400).json({ mensaje: `La talla elegida no existe para ${producto.nombre}.` });
+        }
+        if (!Number.isInteger(cantidad) || cantidad < 1 || cantidad > 10) {
+            return respuesta.status(400).json({ mensaje: "La cantidad de cada producto debe estar entre 1 y 10." });
+        }
+
+        lineas.push({
+            productoId: producto.id,
+            nombre: producto.nombre,
+            talla: item.talla,
+            cantidad: cantidad,
+            precioCentimos: producto.precioCentimos,
+        });
+        totalCentimos += producto.precioCentimos * cantidad;
+    }
+
+    try {
+        const pedidoId = guardarPedido(peticion.usuario.id, lineas, totalCentimos);
+
+        // Respondemos con los datos del servidor (en soles) para armar el mensaje de WhatsApp
+        return respuesta.status(201).json({
+            mensaje: "¡Pedido registrado! 🐾",
+            pedido: {
+                id: pedidoId,
+                total: totalCentimos / 100,
+                items: lineas.map((linea) => ({
+                    nombre: linea.nombre,
+                    talla: linea.talla,
+                    cantidad: linea.cantidad,
+                    subtotal: (linea.precioCentimos * linea.cantidad) / 100,
+                })),
+            },
+        });
+    } catch (error) {
+        console.error("Error al guardar el pedido:", error);
+        return respuesta.status(500).json({ mensaje: "Ocurrió un error en el servidor 😿" });
+    }
 });
 
 aplicacion.listen(PUERTO, () => {
