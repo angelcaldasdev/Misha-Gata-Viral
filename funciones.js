@@ -672,7 +672,8 @@ async function enviarPedidoPorWhatsApp() {
         `Hola, quiero confirmar mi pedido N.º ${pedido.id} de la tienda de Misha\n` +
         lineas.join("\n") + "\n" +
         `• Total: ${formatearSoles(pedido.total)}\n` +
-        `• A nombre de: ${usuario.nombre} (${usuario.correo})\n` +
+        `• A nombre de: ${nombreCompleto(usuario)} (${usuario.correo})\n` +
+        (usuario.celular ? `• Celular: ${usuario.celular}\n` : "") +
         "Te envío la captura de mi pago por Yape.";
 
     const enlace = `https://wa.me/${NUMERO_WHATSAPP}?text=${encodeURIComponent(mensaje)}`;
@@ -699,11 +700,10 @@ botonEnviarPedido.addEventListener("click", enviarPedidoPorWhatsApp);
 dibujarCarrito();
 
 // ============================================
-// CUENTA: CREAR CUENTA E INICIAR SESIÓN (conectada al servidor Express)
+// CUENTA: REGISTRO, SESIÓN, PEDIDOS, DATOS Y CONTRASEÑA (conectada al servidor Express)
 // ============================================
-// Ahora las cuentas viven en la base de datos del servidor (SQLite) y las
-// contraseñas se guardan con bcrypt. En el navegador solo guardamos el TOKEN
-// de sesión (JWT) que nos entrega el servidor cuando iniciamos sesión.
+// Las cuentas viven en la base de datos del servidor (SQLite) y las contraseñas
+// se guardan con bcrypt. En el navegador solo guardamos el TOKEN de sesión (JWT).
 
 const botonCuenta = document.getElementById("botonCuenta");
 const textoCuenta = document.getElementById("textoCuenta");
@@ -718,14 +718,54 @@ const vistaSesion = document.getElementById("vistaSesion");
 const formLogin = document.getElementById("formLogin");
 const formRegistro = document.getElementById("formRegistro");
 
+// Panel de la persona con sesión iniciada
+const listaPedidos = document.getElementById("listaPedidos");
+const resumenPedidos = document.getElementById("resumenPedidos");
+const formDatos = document.getElementById("formDatos");
+const formClave = document.getElementById("formClave");
+const mensajeDatos = document.getElementById("mensajeDatos");
+const mensajeClave = document.getElementById("mensajeClave");
+const botonSeguirComprando = document.getElementById("botonSeguirComprando");
+
 // Nombre con el que guardamos el token en el navegador (localStorage)
 const CLAVE_TOKEN = "misha_token";
 
-// Datos de la persona con sesión iniciada: { nombre, correo }, o null si no hay sesión
+// Datos de la persona con sesión iniciada: { nombre, apellidos, celular, correo }, o null
 let usuarioSesion = null;
 
-// Habla con el servidor y SIEMPRE devuelve { ok, datos, sinConexion }
+// Letras (con tildes y ñ), espacios, apóstrofes, puntos y guiones: de 2 a 60 caracteres
+const regexNombre = /^[\p{L}][\p{L}\s'’.-]{1,59}$/u;
+
+// Celular peruano: 9 dígitos y empieza con 9
+const regexCelular = /^9\d{8}$/;
+
+// ---- Ayudas para limpiar lo que escribe la persona ----
+
+// Quita espacios de los costados y deja un solo espacio entre palabras
+function limpiarTexto(texto) {
+    return texto.trim().replace(/\s+/g, " ");
+}
+
+// Deja solo los dígitos del celular (y quita el prefijo +51 si lo escribió)
+function limpiarCelular(texto) {
+    let digitos = texto.replace(/\D/g, "");
+    if (digitos.length === 11 && digitos.startsWith("51")) {
+        digitos = digitos.slice(2);
+    }
+    return digitos;
+}
+
+// Devuelve el mensaje de error, o null si los datos personales están bien
+function validarDatosPersonales(nombres, apellidos, celular) {
+    if (!regexNombre.test(nombres)) return "Escribe tus nombres (solo letras).";
+    if (!regexNombre.test(apellidos)) return "Escribe tus apellidos (solo letras).";
+    if (!regexCelular.test(celular)) return "Ingresa un celular válido de 9 dígitos que empiece con 9.";
+    return null;
+}
+
+// Habla con el servidor y SIEMPRE devuelve { ok, estado, datos, sinConexion }
 //  - ok: true si el servidor respondió con éxito
+//  - estado: el código HTTP (200, 400, 401...), o 0 si no hubo conexión
 //  - datos: el JSON que respondió el servidor (ej: { mensaje: "..." })
 //  - sinConexion: true si no se pudo llegar al servidor (apagado o sin internet)
 async function pedirAlServidor(ruta, metodo, cuerpo, token) {
@@ -755,10 +795,16 @@ async function pedirAlServidor(ruta, metodo, cuerpo, token) {
     }
 }
 
-// Devuelve { nombre, correo } si hay sesión iniciada, o null si no
+// Devuelve { nombre, apellidos, celular, correo } si hay sesión iniciada, o null si no
 // (el carrito usa esta función para pedir iniciar sesión antes de enviar el pedido)
 function usuarioActual() {
     return usuarioSesion;
+}
+
+// "Angel Rafael" + "Caldas Ocmín" -> "Angel Rafael Caldas Ocmín"
+// (las cuentas antiguas no tienen apellidos: en ese caso solo sale el nombre)
+function nombreCompleto(usuario) {
+    return [usuario.nombre, usuario.apellidos].filter(Boolean).join(" ");
 }
 
 // Guarda el token y los datos de la persona después de iniciar sesión
@@ -768,9 +814,24 @@ function guardarSesion(datosLogin) {
     actualizarBotonCuenta();
 }
 
-// Cambia el texto del botón de la barra: "Ingresar" o el nombre de la persona
+// Cambia el texto del botón de la barra: "Ingresar" o el primer nombre de la persona
 function actualizarBotonCuenta() {
     textoCuenta.textContent = usuarioSesion ? usuarioSesion.nombre.split(" ")[0] : "Ingresar";
+}
+
+// Crea un elemento con clase y texto. Usamos textContent (no innerHTML) para que
+// nada de lo que venga del servidor pueda meter código raro en la página.
+function crearElemento(etiqueta, clase, texto) {
+    const elemento = document.createElement(etiqueta);
+    if (clase) elemento.className = clase;
+    if (texto !== undefined) elemento.textContent = texto;
+    return elemento;
+}
+
+// Escribe un mensaje en un <p> de mensajes ("exito" lo pinta de verde)
+function mostrarMensajeEn(elemento, texto, tipo) {
+    elemento.textContent = texto;
+    elemento.className = "mensaje-pedido " + (tipo || "");
 }
 
 // Muestra solo una de las 3 vistas de la ventana
@@ -782,12 +843,128 @@ function mostrarVistaCuenta(nombreVista) {
     mensajeCuenta.className = "mensaje-pedido";
 }
 
+function mensajeEnCuenta(texto, tipo) {
+    mostrarMensajeEn(mensajeCuenta, texto, tipo);
+}
+
+// ---- Pestañas del panel (Mis pedidos / Mis datos / Contraseña) ----
+const pestanasCuenta = document.querySelectorAll(".cuenta-pestana");
+
+function mostrarPanel(idPanel) {
+    pestanasCuenta.forEach((pestana) => {
+        pestana.classList.toggle("activa", pestana.dataset.panel === idPanel);
+    });
+    document.querySelectorAll(".cuenta-panel").forEach((panel) => {
+        panel.hidden = panel.id !== idPanel;
+    });
+}
+
+pestanasCuenta.forEach((pestana) => {
+    pestana.addEventListener("click", () => mostrarPanel(pestana.dataset.panel));
+});
+
+// ---- Historial de pedidos ----
+
+// El servidor guarda la fecha en hora UTC ("2026-10-16 05:48:20"): la pasamos a hora de Lima
+function formatearFechaLima(textoFecha) {
+    const fecha = new Date(textoFecha.replace(" ", "T") + "Z");
+    return fecha.toLocaleString("es-PE", {
+        timeZone: "America/Lima",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+}
+
+// Dibuja un <details> por cada pedido: se ve el resumen y al hacer clic se despliegan los productos
+function dibujarPedidos(pedidos) {
+    listaPedidos.innerHTML = "";
+
+    if (pedidos.length === 0) {
+        resumenPedidos.textContent = "";
+        listaPedidos.appendChild(
+            crearElemento("li", "pedidos-vacio", "Aún no tienes pedidos. ¡Misha te espera en la tienda! 🐾")
+        );
+        return;
+    }
+
+    resumenPedidos.textContent =
+        pedidos.length === 1 ? "Tienes 1 pedido registrado." : `Tienes ${pedidos.length} pedidos registrados.`;
+
+    pedidos.forEach((pedido) => {
+        const detalles = crearElemento("details", "pedido");
+
+        // Lo que se ve siempre: número, total, fecha y estado
+        const resumen = document.createElement("summary");
+        resumen.appendChild(crearElemento("span", "pedido-numero", `Pedido N.º ${pedido.id}`));
+        resumen.appendChild(crearElemento("span", "pedido-total", formatearSoles(pedido.total)));
+        resumen.appendChild(crearElemento("span", "pedido-fecha", formatearFechaLima(pedido.fecha)));
+        resumen.appendChild(crearElemento("span", "pedido-estado estado-" + pedido.estado, pedido.estado));
+        detalles.appendChild(resumen);
+
+        // Lo que se despliega: cada producto con su cantidad y subtotal
+        const productos = crearElemento("ul", "pedido-productos");
+        pedido.items.forEach((item) => {
+            const fila = document.createElement("li");
+
+            const descripcion = crearElemento("span", "", `${item.cantidad} × ${item.nombre}`);
+            descripcion.appendChild(crearElemento("small", "pedido-producto-talla", `Talla: ${item.talla}`));
+
+            fila.appendChild(descripcion);
+            fila.appendChild(crearElemento("span", "pedido-producto-subtotal", formatearSoles(item.subtotal)));
+            productos.appendChild(fila);
+        });
+        detalles.appendChild(productos);
+
+        const elementoLista = document.createElement("li");
+        elementoLista.appendChild(detalles);
+        listaPedidos.appendChild(elementoLista);
+    });
+}
+
+// Pide al servidor los pedidos de la persona y los dibuja
+async function cargarPedidos() {
+    resumenPedidos.textContent = "";
+    listaPedidos.innerHTML = "";
+    listaPedidos.appendChild(crearElemento("li", "pedidos-vacio", "Cargando tus pedidos..."));
+
+    const token = leerAlmacen(CLAVE_TOKEN, null);
+    const resultado = await pedirAlServidor("/api/mis-pedidos", "GET", null, token);
+
+    if (!resultado.ok) {
+        listaPedidos.innerHTML = "";
+        listaPedidos.appendChild(crearElemento("li", "pedidos-vacio", resultado.datos.mensaje));
+        return;
+    }
+
+    dibujarPedidos(resultado.datos.pedidos);
+}
+
+// ---- Abrir la ventana de la cuenta ----
+
+// Llena el saludo y el formulario "Mis datos" con la información de la persona
+function prepararVistaSesion(usuario) {
+    document.getElementById("nombreUsuario").textContent = nombreCompleto(usuario);
+    document.getElementById("correoUsuario").textContent = usuario.correo;
+
+    document.getElementById("datosNombres").value = usuario.nombre;
+    document.getElementById("datosApellidos").value = usuario.apellidos || "";
+    document.getElementById("datosCelular").value = usuario.celular || "";
+    document.getElementById("datosCorreo").value = usuario.correo;
+
+    formClave.reset();
+    mostrarMensajeEn(mensajeDatos, "");
+    mostrarMensajeEn(mensajeClave, "");
+    mostrarPanel("panelPedidos");
+}
+
 function abrirCuenta(vista, aviso) {
     const usuario = usuarioActual();
 
     if (usuario) {
-        document.getElementById("nombreUsuario").textContent = usuario.nombre;
-        document.getElementById("correoUsuario").textContent = usuario.correo;
+        prepararVistaSesion(usuario);
         mostrarVistaCuenta("sesion");
     } else {
         mostrarVistaCuenta(vista || "login");
@@ -795,11 +972,9 @@ function abrirCuenta(vista, aviso) {
 
     avisoCuenta.textContent = aviso || "";
     if (!modalCuenta.open) modalCuenta.showModal();
-}
 
-function mensajeEnCuenta(texto, tipo) {
-    mensajeCuenta.textContent = texto;
-    mensajeCuenta.className = "mensaje-pedido " + (tipo || "");
+    // Con sesión iniciada, traemos el historial actualizado
+    if (usuario) cargarPedidos();
 }
 
 botonCuenta.addEventListener("click", () => abrirCuenta("login"));
@@ -818,14 +993,17 @@ document.getElementById("irALogin").addEventListener("click", (evento) => {
 formRegistro.addEventListener("submit", async (evento) => {
     evento.preventDefault();
 
-    const nombre = document.getElementById("registroNombre").value.trim();
+    const nombre = limpiarTexto(document.getElementById("registroNombres").value);
+    const apellidos = limpiarTexto(document.getElementById("registroApellidos").value);
+    const celular = limpiarCelular(document.getElementById("registroCelular").value);
     const correo = document.getElementById("registroCorreo").value.trim().toLowerCase();
     const clave = document.getElementById("registroClave").value;
     const clave2 = document.getElementById("registroClave2").value;
 
     // 1) Validaciones rápidas en la página (el servidor las vuelve a hacer)
-    if (nombre.length < 2) {
-        mensajeEnCuenta("Escribe tu nombre.");
+    const errorDatos = validarDatosPersonales(nombre, apellidos, celular);
+    if (errorDatos) {
+        mensajeEnCuenta(errorDatos);
         return;
     }
     if (!regexCorreo.test(correo)) {
@@ -847,7 +1025,7 @@ formRegistro.addEventListener("submit", async (evento) => {
     mensajeEnCuenta("Creando tu cuenta...");
 
     // 3) Le pedimos al servidor que cree la cuenta
-    const registro = await pedirAlServidor("/api/registro", "POST", { nombre, correo, clave });
+    const registro = await pedirAlServidor("/api/registro", "POST", { nombre, apellidos, celular, correo, clave });
 
     if (!registro.ok) {
         mensajeEnCuenta(registro.datos.mensaje);
@@ -902,6 +1080,89 @@ formLogin.addEventListener("submit", async (evento) => {
     mostrarAviso(login.datos.mensaje);
 });
 
+// ---- Mis datos: guardar cambios ----
+formDatos.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+
+    const nombre = limpiarTexto(document.getElementById("datosNombres").value);
+    const apellidos = limpiarTexto(document.getElementById("datosApellidos").value);
+    const celular = limpiarCelular(document.getElementById("datosCelular").value);
+
+    const errorDatos = validarDatosPersonales(nombre, apellidos, celular);
+    if (errorDatos) {
+        mostrarMensajeEn(mensajeDatos, errorDatos);
+        return;
+    }
+
+    const botonEnviar = formDatos.querySelector('button[type="submit"]');
+    botonEnviar.disabled = true;
+    mostrarMensajeEn(mensajeDatos, "Guardando...");
+
+    const token = leerAlmacen(CLAVE_TOKEN, null);
+    const resultado = await pedirAlServidor("/api/perfil", "PUT", { nombre, apellidos, celular }, token);
+    botonEnviar.disabled = false;
+
+    if (!resultado.ok) {
+        mostrarMensajeEn(mensajeDatos, resultado.datos.mensaje);
+        return;
+    }
+
+    // Actualizamos lo que se ve en pantalla con los datos que confirmó el servidor
+    usuarioSesion = resultado.datos.usuario;
+    actualizarBotonCuenta();
+    prepararVistaSesion(usuarioSesion);
+    mostrarPanel("panelDatos");
+    mostrarMensajeEn(mensajeDatos, resultado.datos.mensaje, "exito");
+});
+
+// ---- Cambiar contraseña ----
+formClave.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+
+    const claveActual = document.getElementById("claveActual").value;
+    const claveNueva = document.getElementById("claveNueva").value;
+    const claveNueva2 = document.getElementById("claveNueva2").value;
+
+    if (claveActual.length === 0) {
+        mostrarMensajeEn(mensajeClave, "Escribe tu contraseña actual.");
+        return;
+    }
+    if (claveNueva.length < 6) {
+        mostrarMensajeEn(mensajeClave, "La contraseña nueva debe tener al menos 6 caracteres.");
+        return;
+    }
+    if (claveNueva !== claveNueva2) {
+        mostrarMensajeEn(mensajeClave, "Las contraseñas nuevas no coinciden.");
+        return;
+    }
+    if (claveNueva === claveActual) {
+        mostrarMensajeEn(mensajeClave, "La contraseña nueva debe ser distinta a la actual.");
+        return;
+    }
+
+    const botonEnviar = formClave.querySelector('button[type="submit"]');
+    botonEnviar.disabled = true;
+    mostrarMensajeEn(mensajeClave, "Guardando...");
+
+    const token = leerAlmacen(CLAVE_TOKEN, null);
+    const resultado = await pedirAlServidor("/api/clave", "PUT", { claveActual, claveNueva }, token);
+    botonEnviar.disabled = false;
+
+    if (!resultado.ok) {
+        mostrarMensajeEn(mensajeClave, resultado.datos.mensaje);
+        return;
+    }
+
+    formClave.reset();
+    mostrarMensajeEn(mensajeClave, resultado.datos.mensaje, "exito");
+});
+
+// ---- Seguir comprando: cierra la ventana y baja a los productos ----
+botonSeguirComprando.addEventListener("click", () => {
+    modalCuenta.close();
+    document.getElementById("productos").scrollIntoView({ behavior: "smooth" });
+});
+
 // ---- Cerrar sesión ----
 // Borramos el token del navegador y listo
 document.getElementById("botonCerrarSesion").addEventListener("click", () => {
@@ -914,7 +1175,7 @@ document.getElementById("botonCerrarSesion").addEventListener("click", () => {
 
 // ---- Recordar la sesión al recargar la página ----
 // Si hay un token guardado, se lo mostramos al servidor (/api/perfil)
-// para confirmar que sigue siendo válido y recuperar el nombre.
+// para confirmar que sigue siendo válido y recuperar los datos de la persona.
 async function restaurarSesion() {
     const token = leerAlmacen(CLAVE_TOKEN, null);
     if (!token) return;

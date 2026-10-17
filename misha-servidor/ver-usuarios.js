@@ -9,7 +9,7 @@ const baseDeDatos = require("./db");
 
 const usuarios = baseDeDatos
     .prepare(`
-        SELECT id, nombre, correo,
+        SELECT id, nombre, apellidos, celular, correo,
                substr(clave_hash, 1, 20) || '...' AS inicio_del_hash,
                fecha_registro
         FROM usuarios

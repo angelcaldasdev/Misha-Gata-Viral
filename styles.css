@@ -970,6 +970,193 @@ button:hover {
     border-radius: 16px;
 }
 
+/* ===== 🆕 CUENTA: registro en dos columnas y panel de la persona ===== */
+
+.fila-doble {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.fila-doble label {
+    min-width: 0;
+}
+
+.modal-cuenta {
+    width: min(560px, 94%);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.form-cuenta input:disabled {
+    background-color: var(--crema);
+    opacity: 0.8;
+    cursor: not-allowed;
+}
+
+.cuenta-correo {
+    margin: 0 0 14px;
+}
+
+/* Pestañas (anulan el estilo general de button) */
+.cuenta-pestanas {
+    display: flex;
+    gap: 6px;
+    margin: 4px 0 14px;
+    border-bottom: 2px solid var(--crema);
+}
+
+.cuenta-pestana {
+    flex: 1;
+    padding: 10px 6px;
+    border-radius: 10px 10px 0 0;
+    background: transparent;
+    color: var(--chocolate);
+    font-size: 0.95rem;
+}
+
+.cuenta-pestana:hover {
+    background-color: var(--crema);
+    color: var(--chocolate);
+}
+
+.cuenta-pestana.activa {
+    background-color: var(--jengibre);
+    color: var(--blanco);
+}
+
+.cuenta-panel {
+    text-align: left;
+    margin-bottom: 14px;
+}
+
+.cuenta-panel[hidden] {
+    display: none;
+}
+
+.cuenta-resumen {
+    margin: 0 0 10px;
+    font-weight: 700;
+    color: var(--chocolate);
+}
+
+.cuenta-resumen:empty {
+    display: none;
+}
+
+/* Lista de pedidos: cada uno es un <details> que se despliega al hacer clic */
+.lista-pedidos {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.pedidos-vacio {
+    padding: 22px 12px;
+    text-align: center;
+    background-color: var(--crema);
+    border-radius: 14px;
+}
+
+.pedido {
+    border: 2px solid var(--crema);
+    border-radius: 14px;
+    background-color: var(--blanco);
+}
+
+.pedido[open] {
+    border-color: var(--jengibre);
+}
+
+.pedido summary {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 12px;
+    padding: 10px 14px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.pedido summary::-webkit-details-marker {
+    display: none;
+}
+
+.pedido-numero {
+    font-weight: 700;
+    color: var(--chocolate);
+}
+
+.pedido-numero::before {
+    content: "▸ ";
+    color: var(--jengibre);
+}
+
+.pedido[open] .pedido-numero::before {
+    content: "▾ ";
+}
+
+.pedido-total {
+    font-weight: 700;
+    color: var(--jengibre);
+    text-align: right;
+}
+
+.pedido-fecha {
+    font-size: 0.85rem;
+}
+
+.pedido-estado {
+    justify-self: end;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: capitalize;
+    background-color: #FBF1DF;
+    color: var(--chocolate);
+}
+
+.estado-pagado,
+.estado-entregado {
+    background-color: #DCEFD9;
+    color: #2E7D32;
+}
+
+.estado-cancelado {
+    background-color: #F7D9D9;
+    color: #C62828;
+}
+
+.pedido-productos {
+    list-style: none;
+    margin: 0;
+    padding: 4px 14px 12px;
+    border-top: 1px dashed var(--crema);
+}
+
+.pedido-productos li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    font-size: 0.92rem;
+}
+
+.pedido-producto-talla {
+    display: block;
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+.pedido-producto-subtotal {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
 /* ===== CARRITO (panel lateral) ===== */
 
 .carrito-fondo {
@@ -1255,6 +1442,17 @@ button:hover {
     .productos-grid {
         grid-template-columns: repeat(2, 1fr);
         gap: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Registro: nombres y apellidos uno debajo del otro */
+    .fila-doble {
+        grid-template-columns: 1fr;
+    }
+
+    .cuenta-pestana {
+        font-size: 0.8rem;
     }
 }
 

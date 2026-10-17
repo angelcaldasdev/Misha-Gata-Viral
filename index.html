@@ -174,8 +174,16 @@
         <div id="vistaRegistro" hidden>
             <h3 class="modal-titulo">Crear cuenta</h3>
             <form id="formRegistro" class="form-cuenta" novalidate>
-                <label>Nombre
-                    <input type="text" id="registroNombre" placeholder="Ej: Ana Pérez" autocomplete="name" required>
+                <div class="fila-doble">
+                    <label>Nombres
+                        <input type="text" id="registroNombres" placeholder="Ej: Ana María" autocomplete="given-name" required>
+                    </label>
+                    <label>Apellidos
+                        <input type="text" id="registroApellidos" placeholder="Ej: Pérez Ruiz" autocomplete="family-name" required>
+                    </label>
+                </div>
+                <label>Celular
+                    <input type="tel" id="registroCelular" placeholder="Ej: 987654321" inputmode="numeric" maxlength="12" autocomplete="tel-national" required>
                 </label>
                 <label>Correo
                     <input type="email" id="registroCorreo" placeholder="tu@correo.com" autocomplete="email" required>
@@ -194,8 +202,62 @@
         <!-- Vista 3: sesión activa -->
         <div id="vistaSesion" hidden>
             <h3 class="modal-titulo">¡Hola, <span id="nombreUsuario"></span>! 🐱</h3>
-            <p id="correoUsuario"></p>
-            <button type="button" id="botonCerrarSesion" class="boton-principal">Cerrar sesión</button>
+            <p id="correoUsuario" class="cuenta-correo"></p>
+
+            <!-- Pestañas: cada una muestra un panel distinto -->
+            <div class="cuenta-pestanas">
+                <button type="button" class="cuenta-pestana activa" data-panel="panelPedidos">🛍️ Mis pedidos</button>
+                <button type="button" class="cuenta-pestana" data-panel="panelDatos">👤 Mis datos</button>
+                <button type="button" class="cuenta-pestana" data-panel="panelClave">🔑 Contraseña</button>
+            </div>
+
+            <!-- Panel 1: historial de pedidos (cada pedido se despliega con <details>) -->
+            <section id="panelPedidos" class="cuenta-panel">
+                <p id="resumenPedidos" class="cuenta-resumen"></p>
+                <ul id="listaPedidos" class="lista-pedidos"></ul>
+            </section>
+
+            <!-- Panel 2: datos personales (el correo no se puede cambiar) -->
+            <section id="panelDatos" class="cuenta-panel" hidden>
+                <form id="formDatos" class="form-cuenta" novalidate>
+                    <div class="fila-doble">
+                        <label>Nombres
+                            <input type="text" id="datosNombres" autocomplete="given-name" required>
+                        </label>
+                        <label>Apellidos
+                            <input type="text" id="datosApellidos" autocomplete="family-name" required>
+                        </label>
+                    </div>
+                    <label>Celular
+                        <input type="tel" id="datosCelular" inputmode="numeric" maxlength="12" autocomplete="tel-national" required>
+                    </label>
+                    <label>Correo (no se puede cambiar)
+                        <input type="email" id="datosCorreo" disabled>
+                    </label>
+                    <button type="submit" class="boton-principal">Guardar cambios</button>
+                </form>
+                <p id="mensajeDatos" class="mensaje-pedido" role="status" aria-live="polite"></p>
+            </section>
+
+            <!-- Panel 3: cambiar contraseña -->
+            <section id="panelClave" class="cuenta-panel" hidden>
+                <form id="formClave" class="form-cuenta" novalidate>
+                    <label>Contraseña actual
+                        <input type="password" id="claveActual" autocomplete="current-password" required>
+                    </label>
+                    <label>Contraseña nueva (mínimo 6 caracteres)
+                        <input type="password" id="claveNueva" autocomplete="new-password" required>
+                    </label>
+                    <label>Repite la contraseña nueva
+                        <input type="password" id="claveNueva2" autocomplete="new-password" required>
+                    </label>
+                    <button type="submit" class="boton-principal">Cambiar contraseña</button>
+                </form>
+                <p id="mensajeClave" class="mensaje-pedido" role="status" aria-live="polite"></p>
+            </section>
+
+            <button type="button" id="botonSeguirComprando" class="boton-principal">🛍️ Seguir comprando</button>
+            <button type="button" id="botonCerrarSesion" class="boton-secundario">Cerrar sesión</button>
         </div>
 
         <p id="mensajeCuenta" class="mensaje-pedido" role="status" aria-live="polite"></p>

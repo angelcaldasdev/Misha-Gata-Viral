@@ -33,11 +33,28 @@ baseDeDatos.exec(`
     CREATE TABLE IF NOT EXISTS usuarios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nombre TEXT NOT NULL,
+        apellidos TEXT NOT NULL DEFAULT '',
+        celular TEXT NOT NULL DEFAULT '',
         correo TEXT NOT NULL UNIQUE,
         clave_hash TEXT NOT NULL,
         fecha_registro TEXT NOT NULL DEFAULT (datetime('now'))
     )
 `);
+
+// 🆕 MIGRACIÓN: tu base de datos ya existe, y "CREATE TABLE IF NOT EXISTS" no modifica
+// las tablas viejas. Con ALTER TABLE agregamos las columnas nuevas SOLO si todavía no están,
+// así conservas las cuentas que ya creaste.
+const columnasDeUsuarios = baseDeDatos
+    .prepare("PRAGMA table_info(usuarios)")
+    .all()
+    .map((columna) => columna.name);
+
+if (!columnasDeUsuarios.includes("apellidos")) {
+    baseDeDatos.exec("ALTER TABLE usuarios ADD COLUMN apellidos TEXT NOT NULL DEFAULT ''");
+}
+if (!columnasDeUsuarios.includes("celular")) {
+    baseDeDatos.exec("ALTER TABLE usuarios ADD COLUMN celular TEXT NOT NULL DEFAULT ''");
+}
 
 // 🆕 Tabla "pedidos": una fila por cada compra.
 // - usuario_id: quién hizo el pedido (apunta a la tabla usuarios)

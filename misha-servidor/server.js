@@ -58,23 +58,66 @@ aplicacion.post("/api/suscribirse", (peticion, respuesta) => {
 // ============================================
 
 const insertarUsuario = baseDeDatos.prepare(
-    "INSERT INTO usuarios (nombre, correo, clave_hash) VALUES (?, ?, ?)"
+    "INSERT INTO usuarios (nombre, apellidos, celular, correo, clave_hash) VALUES (?, ?, ?, ?, ?)"
 );
+
+// ---- 🆕 Ayudas para limpiar y validar los datos personales ----
+
+// Quita espacios de los costados y deja un solo espacio entre palabras
+function limpiarTexto(valor) {
+    return String(valor || "").trim().replace(/\s+/g, " ");
+}
+
+// Deja solo los dígitos del celular. Si viene con el prefijo +51, lo quita.
+function normalizarCelular(valor) {
+    let digitos = String(valor || "").replace(/\D/g, "");
+    if (digitos.length === 11 && digitos.startsWith("51")) {
+        digitos = digitos.slice(2);
+    }
+    return digitos;
+}
+
+// Letras (con tildes y ñ), espacios, apóstrofes, puntos y guiones: de 2 a 60 caracteres
+const regexNombre = /^[\p{L}][\p{L}\s'’.-]{1,59}$/u;
+
+// Celular peruano: 9 dígitos y empieza con 9
+const regexCelular = /^9\d{8}$/;
+
+// Devuelve el mensaje de error, o null si todo está bien
+function validarDatosPersonales(nombre, apellidos, celular) {
+    if (!regexNombre.test(nombre)) return "Escribe tus nombres (solo letras).";
+    if (!regexNombre.test(apellidos)) return "Escribe tus apellidos (solo letras).";
+    if (!regexCelular.test(celular)) return "Ingresa un celular válido de 9 dígitos que empiece con 9.";
+    return null;
+}
+
+// Los datos del usuario que SÍ se le pueden enviar a la página (nunca el hash de la clave)
+function usuarioParaLaPagina(usuario) {
+    return {
+        nombre: usuario.nombre,
+        apellidos: usuario.apellidos,
+        celular: usuario.celular,
+        correo: usuario.correo,
+    };
+}
 
 // "Costo" de bcrypt: cuántas veces se repite el cálculo (2 elevado a 10 vueltas).
 // Más alto = más seguro pero más lento. 10 es un valor estándar.
 const COSTO_BCRYPT = 10;
 
 // ---- POST /api/registro ----
-// La página envía: { nombre, correo, clave }
+// La página envía: { nombre, apellidos, celular, correo, clave }
 aplicacion.post("/api/registro", async (peticion, respuesta) => {
-    const nombre = String(peticion.body.nombre || "").trim();
+    const nombre = limpiarTexto(peticion.body.nombre);
+    const apellidos = limpiarTexto(peticion.body.apellidos);
+    const celular = normalizarCelular(peticion.body.celular);
     const correo = String(peticion.body.correo || "").trim().toLowerCase();
     const clave = String(peticion.body.clave || "");
 
     // 1) Validaciones (el servidor nunca confía en lo que llega)
-    if (nombre.length < 2) {
-        return respuesta.status(400).json({ mensaje: "Escribe tu nombre." });
+    const errorDatos = validarDatosPersonales(nombre, apellidos, celular);
+    if (errorDatos) {
+        return respuesta.status(400).json({ mensaje: errorDatos });
     }
     if (!regexCorreo.test(correo)) {
         return respuesta.status(400).json({ mensaje: "Ingresa un correo válido." });
@@ -93,7 +136,7 @@ aplicacion.post("/api/registro", async (peticion, respuesta) => {
         const claveHash = await bcrypt.hash(clave, COSTO_BCRYPT);
 
         // 3) Guardamos en la tabla (solo el hash, nunca la contraseña real)
-        insertarUsuario.run(nombre, correo, claveHash);
+        insertarUsuario.run(nombre, apellidos, celular, correo, claveHash);
 
         // 4) Respondemos SIN devolver el hash
         return respuesta.status(201).json({ mensaje: "¡Cuenta creada! Ya puedes iniciar sesión 🐱" });
@@ -125,11 +168,11 @@ if (!JWT_SECRETO) {
 }
 
 const buscarUsuarioPorCorreo = baseDeDatos.prepare(
-    "SELECT id, nombre, correo, clave_hash FROM usuarios WHERE correo = ?"
+    "SELECT id, nombre, apellidos, celular, correo, clave_hash FROM usuarios WHERE correo = ?"
 );
 
 const buscarUsuarioPorId = baseDeDatos.prepare(
-    "SELECT id, nombre, correo FROM usuarios WHERE id = ?"
+    "SELECT id, nombre, apellidos, celular, correo FROM usuarios WHERE id = ?"
 );
 
 // Hash de mentira: si el correo no existe, igual hacemos una comparación con este.
@@ -163,7 +206,7 @@ aplicacion.post("/api/login", async (peticion, respuesta) => {
         return respuesta.json({
             mensaje: `¡Hola de nuevo, ${usuario.nombre.split(" ")[0]}! 🐾`,
             token: token,
-            usuario: { nombre: usuario.nombre, correo: usuario.correo },
+            usuario: usuarioParaLaPagina(usuario),
         });
     } catch (error) {
         console.error("Error en el login:", error);
@@ -203,7 +246,7 @@ function exigirSesion(peticion, respuesta, siguiente) {
 // La página la usará al cargar para saber si la persona sigue con sesión.
 aplicacion.get("/api/perfil", exigirSesion, (peticion, respuesta) => {
     respuesta.json({
-        usuario: { nombre: peticion.usuario.nombre, correo: peticion.usuario.correo },
+        usuario: usuarioParaLaPagina(peticion.usuario),
     });
 });
 
@@ -303,6 +346,107 @@ aplicacion.post("/api/pedidos", exigirSesion, (peticion, respuesta) => {
         console.error("Error al guardar el pedido:", error);
         return respuesta.status(500).json({ mensaje: "Ocurrió un error en el servidor 😿" });
     }
+});
+
+// ============================================
+// 🆕 MI CUENTA: datos, contraseña e historial de pedidos
+// ============================================
+
+const actualizarDatosUsuario = baseDeDatos.prepare(
+    "UPDATE usuarios SET nombre = ?, apellidos = ?, celular = ? WHERE id = ?"
+);
+const buscarClaveHash = baseDeDatos.prepare("SELECT clave_hash FROM usuarios WHERE id = ?");
+const actualizarClaveHash = baseDeDatos.prepare("UPDATE usuarios SET clave_hash = ? WHERE id = ?");
+
+// Los últimos 50 pedidos de UNA persona (la más reciente primero)
+const listarPedidosDeUsuario = baseDeDatos.prepare(`
+    SELECT id, total_centimos, estado, fecha_pedido
+    FROM pedidos
+    WHERE usuario_id = ?
+    ORDER BY id DESC
+    LIMIT 50
+`);
+const listarDetalleDePedido = baseDeDatos.prepare(`
+    SELECT nombre, talla, cantidad, precio_centimos
+    FROM detalle_pedido
+    WHERE pedido_id = ?
+    ORDER BY id
+`);
+
+// ---- PUT /api/perfil ----  (cambiar nombres, apellidos y celular)
+// El correo NO se puede cambiar porque es lo que identifica la cuenta.
+aplicacion.put("/api/perfil", exigirSesion, (peticion, respuesta) => {
+    const nombre = limpiarTexto(peticion.body.nombre);
+    const apellidos = limpiarTexto(peticion.body.apellidos);
+    const celular = normalizarCelular(peticion.body.celular);
+
+    const errorDatos = validarDatosPersonales(nombre, apellidos, celular);
+    if (errorDatos) {
+        return respuesta.status(400).json({ mensaje: errorDatos });
+    }
+
+    try {
+        actualizarDatosUsuario.run(nombre, apellidos, celular, peticion.usuario.id);
+
+        return respuesta.json({
+            mensaje: "Datos actualizados ✅",
+            usuario: usuarioParaLaPagina({ ...peticion.usuario, nombre, apellidos, celular }),
+        });
+    } catch (error) {
+        console.error("Error al actualizar los datos:", error);
+        return respuesta.status(500).json({ mensaje: "Ocurrió un error en el servidor 😿" });
+    }
+});
+
+// ---- PUT /api/clave ----  (cambiar contraseña)
+aplicacion.put("/api/clave", exigirSesion, async (peticion, respuesta) => {
+    const claveActual = String(peticion.body.claveActual || "");
+    const claveNueva = String(peticion.body.claveNueva || "");
+
+    if (claveNueva.length < 6) {
+        return respuesta.status(400).json({ mensaje: "La contraseña nueva debe tener al menos 6 caracteres." });
+    }
+    if (Buffer.byteLength(claveNueva, "utf8") > 72) {
+        return respuesta.status(400).json({ mensaje: "La contraseña nueva es demasiado larga (máximo 72 caracteres)." });
+    }
+
+    try {
+        // Primero comprobamos que sabe su contraseña actual
+        const fila = buscarClaveHash.get(peticion.usuario.id);
+        const claveActualCorrecta = await bcrypt.compare(claveActual, fila.clave_hash);
+
+        if (!claveActualCorrecta) {
+            return respuesta.status(400).json({ mensaje: "La contraseña actual no es correcta." });
+        }
+
+        const nuevoHash = await bcrypt.hash(claveNueva, COSTO_BCRYPT);
+        actualizarClaveHash.run(nuevoHash, peticion.usuario.id);
+
+        return respuesta.json({ mensaje: "Contraseña actualizada ✅" });
+    } catch (error) {
+        console.error("Error al cambiar la contraseña:", error);
+        return respuesta.status(500).json({ mensaje: "Ocurrió un error en el servidor 😿" });
+    }
+});
+
+// ---- GET /api/mis-pedidos ----  (historial de la persona con sesión iniciada)
+// Solo devuelve los pedidos de ESA persona: el id sale del token, no de la página.
+aplicacion.get("/api/mis-pedidos", exigirSesion, (peticion, respuesta) => {
+    const pedidos = listarPedidosDeUsuario.all(peticion.usuario.id).map((pedido) => ({
+        id: pedido.id,
+        fecha: pedido.fecha_pedido,   // viene en hora UTC; la página la convierte a hora de Lima
+        estado: pedido.estado,
+        total: pedido.total_centimos / 100,
+        items: listarDetalleDePedido.all(pedido.id).map((item) => ({
+            nombre: item.nombre,
+            talla: item.talla,
+            cantidad: item.cantidad,
+            precio: item.precio_centimos / 100,
+            subtotal: (item.precio_centimos * item.cantidad) / 100,
+        })),
+    }));
+
+    respuesta.json({ pedidos });
 });
 
 aplicacion.listen(PUERTO, () => {
