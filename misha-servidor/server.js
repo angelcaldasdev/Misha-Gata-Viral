@@ -1,36 +1,91 @@
 // ============================================
-// server.js - Servidor de Misha (Express + SQLite)
+// server.js - Servidor de Misha (Express + SQLite/Turso)
 // ============================================
 
-require("dotenv").config();            // 🆕 carga las variables del archivo .env
+require("dotenv").config({ quiet: true });   // carga las variables del archivo .env
 const express = require("express");
 const cors = require("cors");
+const rateLimit = require("express-rate-limit");
 const bcrypt = require("bcryptjs");    // para convertir contraseñas en hash
-const jwt = require("jsonwebtoken");   // 🆕 para crear y revisar los tokens de sesión
-const baseDeDatos = require("./db");   // nuestra conexión a SQLite (db.js)
-const { catalogoPorId } = require("./productos");   // 🆕 precios oficiales (productos.js)
+const jwt = require("jsonwebtoken");   // para crear y revisar los tokens de sesión
+
+const {
+    baseDeDatos,
+    iniciarBaseDeDatos,
+    consultarVarios,
+    consultarUno,
+    ejecutar,
+    usandoNube,
+} = require("./db");
+const { catalogoPorId } = require("./productos");   // precios oficiales (productos.js)
 
 const aplicacion = express();
-const PUERTO = 3000;
 
-// Permite que la página (Live Server, puerto 5500) le hable a este servidor
-aplicacion.use(cors());
+// En la nube, el servicio nos dice en qué puerto escuchar con la variable PORT
+const PUERTO = process.env.PORT || 3000;
 
-// Permite leer el cuerpo de las peticiones en formato JSON
-aplicacion.use(express.json());
+// Render (y casi todos los servicios en la nube) pone un "proxy" delante del servidor.
+// Con esto, Express ve la IP real de cada visitante (la necesita el límite de intentos).
+aplicacion.set("trust proxy", 1);
+
+// ---- CORS: ¿qué páginas pueden usar esta API? ----
+// Solo las que estén en esta lista. Si publicas la página en otro lugar, agrégala en la
+// variable ORIGENES_PERMITIDOS (separadas por comas). Sin "/" al final.
+const ORIGENES_PERMITIDOS = (
+    process.env.ORIGENES_PERMITIDOS ||
+    "https://angelcaldasdev.github.io,http://127.0.0.1:5500,http://localhost:5500"
+)
+    .split(",")
+    .map((origen) => origen.trim())
+    .filter(Boolean);
+
+aplicacion.use(
+    cors({
+        origin(origen, devolver) {
+            // "!origen" son llamadas que no vienen de un navegador (Postman, curl, pruebas)
+            devolver(null, !origen || ORIGENES_PERMITIDOS.includes(origen));
+        },
+    })
+);
+
+// Permite leer el cuerpo de las peticiones en formato JSON (con un tamaño máximo)
+aplicacion.use(express.json({ limit: "20kb" }));
+
+// Si alguien llama a la API sin enviar datos, dejamos el cuerpo vacío en vez de fallar
+aplicacion.use((peticion, respuesta, siguiente) => {
+    if (!peticion.body) peticion.body = {};
+    siguiente();
+});
+
+// ---- Límite de intentos: frena a quien pruebe contraseñas una y otra vez ----
+// Como ahora el servidor es público, cualquiera en internet podría intentarlo.
+const limitarAccesos = rateLimit({
+    windowMs: 15 * 60 * 1000,          // ventana de 15 minutos
+    limit: 20,                          // máximo 20 intentos por persona en esa ventana
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { mensaje: "Demasiados intentos. Espera unos minutos e inténtalo de nuevo." },
+});
 
 // Misma validación de correo que usa la página
 const regexCorreo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// "Consulta preparada": el SQL se escribe una vez y los valores entran por "?".
-// Esto protege contra la inyección SQL (nunca pegues texto del usuario dentro del SQL).
-const insertarSuscriptor = baseDeDatos.prepare(
-    "INSERT INTO suscriptores (correo) VALUES (?)"
-);
+const MENSAJE_ERROR_SERVIDOR = "Ocurrió un error en el servidor 😿";
+
+// ---- GET /api/salud ----
+// La página la llama para "despertar" al servidor (los servidores gratuitos se duermen
+// tras 15 minutos sin visitas) y para comprobar que está listo.
+aplicacion.get("/api/salud", (peticion, respuesta) => {
+    respuesta.json({ ok: true });
+});
+
+// ============================================
+// SUSCRIPCIÓN
+// ============================================
 
 // ---- POST /api/suscribirse ----
 // La página envía: { correo: "alguien@correo.com" }
-aplicacion.post("/api/suscribirse", (peticion, respuesta) => {
+aplicacion.post("/api/suscribirse", limitarAccesos, async (peticion, respuesta) => {
     // El servidor SIEMPRE vuelve a validar, aunque la página ya lo hizo
     // (alguien podría llamar a la API sin pasar por tu página)
     const correo = String(peticion.body.correo || "").trim().toLowerCase();
@@ -40,28 +95,25 @@ aplicacion.post("/api/suscribirse", (peticion, respuesta) => {
     }
 
     try {
-        insertarSuscriptor.run(correo);
+        // El "?" protege contra la inyección SQL (nunca pegues texto del usuario dentro del SQL)
+        await ejecutar("INSERT INTO suscriptores (correo) VALUES (?)", [correo]);
         return respuesta.status(201).json({ mensaje: "¡Gracias por suscribirte a Misha! 🐾" });
     } catch (error) {
         // El correo ya existe en la tabla (columna UNIQUE)
-        if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
+        if (String(error.message).includes("UNIQUE")) {
             return respuesta.status(409).json({ mensaje: "Ese correo ya está suscrito 🐱" });
         }
 
         console.error("Error al guardar el suscriptor:", error);
-        return respuesta.status(500).json({ mensaje: "Ocurrió un error en el servidor 😿" });
+        return respuesta.status(500).json({ mensaje: MENSAJE_ERROR_SERVIDOR });
     }
 });
 
 // ============================================
-// 🆕 REGISTRO DE USUARIOS
+// REGISTRO DE USUARIOS
 // ============================================
 
-const insertarUsuario = baseDeDatos.prepare(
-    "INSERT INTO usuarios (nombre, apellidos, celular, correo, clave_hash) VALUES (?, ?, ?, ?, ?)"
-);
-
-// ---- 🆕 Ayudas para limpiar y validar los datos personales ----
+// ---- Ayudas para limpiar y validar los datos personales ----
 
 // Quita espacios de los costados y deja un solo espacio entre palabras
 function limpiarTexto(valor) {
@@ -107,7 +159,7 @@ const COSTO_BCRYPT = 10;
 
 // ---- POST /api/registro ----
 // La página envía: { nombre, apellidos, celular, correo, clave }
-aplicacion.post("/api/registro", async (peticion, respuesta) => {
+aplicacion.post("/api/registro", limitarAccesos, async (peticion, respuesta) => {
     const nombre = limpiarTexto(peticion.body.nombre);
     const apellidos = limpiarTexto(peticion.body.apellidos);
     const celular = normalizarCelular(peticion.body.celular);
@@ -136,44 +188,38 @@ aplicacion.post("/api/registro", async (peticion, respuesta) => {
         const claveHash = await bcrypt.hash(clave, COSTO_BCRYPT);
 
         // 3) Guardamos en la tabla (solo el hash, nunca la contraseña real)
-        insertarUsuario.run(nombre, apellidos, celular, correo, claveHash);
+        await ejecutar(
+            "INSERT INTO usuarios (nombre, apellidos, celular, correo, clave_hash) VALUES (?, ?, ?, ?, ?)",
+            [nombre, apellidos, celular, correo, claveHash]
+        );
 
         // 4) Respondemos SIN devolver el hash
         return respuesta.status(201).json({ mensaje: "¡Cuenta creada! Ya puedes iniciar sesión 🐱" });
     } catch (error) {
-        if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
+        if (String(error.message).includes("UNIQUE")) {
             return respuesta.status(409).json({ mensaje: "Ese correo ya tiene una cuenta. Inicia sesión." });
         }
 
         console.error("Error al registrar el usuario:", error);
-        return respuesta.status(500).json({ mensaje: "Ocurrió un error en el servidor 😿" });
+        return respuesta.status(500).json({ mensaje: MENSAJE_ERROR_SERVIDOR });
     }
 });
 
 // ============================================
-// 🆕 LOGIN Y SESIÓN (JWT)
+// LOGIN Y SESIÓN (JWT)
 // ============================================
 // Un JWT (JSON Web Token) es una credencial con 3 partes: encabezado, datos y firma.
-// - Los datos (nombre, correo...) se pueden LEER, no van cifrados:
-//   por eso NUNCA metas contraseñas dentro del token.
-// - La firma se crea con nuestro secreto: si alguien cambia un solo dato
-//   del token, la firma ya no coincide y el servidor lo rechaza.
+// - Los datos se pueden LEER, no van cifrados: por eso NUNCA metas contraseñas dentro.
+// - La firma se crea con nuestro secreto: si alguien cambia un solo dato del token,
+//   la firma ya no coincide y el servidor lo rechaza.
 
-// El secreto vive en el archivo .env (que NO se sube a GitHub)
+// El secreto vive en el archivo .env (local) o en las variables de Render (nube)
 const JWT_SECRETO = process.env.JWT_SECRETO;
 
 if (!JWT_SECRETO) {
-    console.error("Falta JWT_SECRETO en el archivo .env. Revisa el paso 3.");
+    console.error("Falta JWT_SECRETO. Revisa tu archivo .env (o las variables de entorno del servicio).");
     process.exit(1);
 }
-
-const buscarUsuarioPorCorreo = baseDeDatos.prepare(
-    "SELECT id, nombre, apellidos, celular, correo, clave_hash FROM usuarios WHERE correo = ?"
-);
-
-const buscarUsuarioPorId = baseDeDatos.prepare(
-    "SELECT id, nombre, apellidos, celular, correo FROM usuarios WHERE id = ?"
-);
 
 // Hash de mentira: si el correo no existe, igual hacemos una comparación con este.
 // Así el servidor tarda parecido en los dos casos y no revela qué correos existen.
@@ -181,13 +227,16 @@ const HASH_FALSO = bcrypt.hashSync("clave-falsa-para-igualar-tiempos", COSTO_BCR
 
 // ---- POST /api/login ----
 // La página envía: { correo, clave }
-aplicacion.post("/api/login", async (peticion, respuesta) => {
+aplicacion.post("/api/login", limitarAccesos, async (peticion, respuesta) => {
     const correo = String(peticion.body.correo || "").trim().toLowerCase();
     const clave = String(peticion.body.clave || "");
 
     try {
         // 1) Buscamos al usuario (devuelve undefined si no existe)
-        const usuario = buscarUsuarioPorCorreo.get(correo);
+        const usuario = await consultarUno(
+            "SELECT id, nombre, apellidos, celular, correo, clave_hash FROM usuarios WHERE correo = ?",
+            [correo]
+        );
 
         // 2) bcrypt compara la contraseña escrita con el hash guardado
         const claveCorrecta = await bcrypt.compare(
@@ -210,13 +259,13 @@ aplicacion.post("/api/login", async (peticion, respuesta) => {
         });
     } catch (error) {
         console.error("Error en el login:", error);
-        return respuesta.status(500).json({ mensaje: "Ocurrió un error en el servidor 😿" });
+        return respuesta.status(500).json({ mensaje: MENSAJE_ERROR_SERVIDOR });
     }
 });
 
 // ---- Middleware: "portero" para las rutas que exigen sesión ----
 // La página manda el token en el encabezado:  Authorization: Bearer <token>
-function exigirSesion(peticion, respuesta, siguiente) {
+async function exigirSesion(peticion, respuesta, siguiente) {
     const encabezado = peticion.headers.authorization || "";
     const [tipo, token] = encabezado.split(" ");
 
@@ -224,12 +273,20 @@ function exigirSesion(peticion, respuesta, siguiente) {
         return respuesta.status(401).json({ mensaje: "Debes iniciar sesión." });
     }
 
+    // 1) verify() revisa la firma y la fecha de vencimiento
+    let datos;
     try {
-        // verify() revisa la firma y la fecha de vencimiento
-        const datos = jwt.verify(token, JWT_SECRETO, { algorithms: ["HS256"] });
+        datos = jwt.verify(token, JWT_SECRETO, { algorithms: ["HS256"] });
+    } catch (error) {
+        return respuesta.status(401).json({ mensaje: "Tu sesión expiró. Inicia sesión de nuevo." });
+    }
 
-        // Volvemos a buscar al usuario: si ya no existe, el token no sirve
-        const usuario = buscarUsuarioPorId.get(datos.id);
+    // 2) Volvemos a buscar al usuario: si ya no existe, el token no sirve
+    try {
+        const usuario = await consultarUno(
+            "SELECT id, nombre, apellidos, celular, correo FROM usuarios WHERE id = ?",
+            [datos.id]
+        );
         if (!usuario) {
             return respuesta.status(401).json({ mensaje: "Debes iniciar sesión." });
         }
@@ -237,57 +294,57 @@ function exigirSesion(peticion, respuesta, siguiente) {
         peticion.usuario = usuario;   // lo dejamos disponible para la ruta
         siguiente();                  // pasa al siguiente paso
     } catch (error) {
-        return respuesta.status(401).json({ mensaje: "Tu sesión expiró. Inicia sesión de nuevo." });
+        console.error("Error al revisar la sesión:", error);
+        return respuesta.status(500).json({ mensaje: MENSAJE_ERROR_SERVIDOR });
     }
 }
 
 // ---- GET /api/perfil ----
 // Ruta protegida: solo responde si llega un token válido.
-// La página la usará al cargar para saber si la persona sigue con sesión.
+// La página la usa al cargar para saber si la persona sigue con sesión.
 aplicacion.get("/api/perfil", exigirSesion, (peticion, respuesta) => {
-    respuesta.json({
-        usuario: usuarioParaLaPagina(peticion.usuario),
-    });
+    respuesta.json({ usuario: usuarioParaLaPagina(peticion.usuario) });
 });
 
 // ============================================
-// 🆕 PEDIDOS
+// PEDIDOS
 // ============================================
-
-const insertarPedido = baseDeDatos.prepare(
-    "INSERT INTO pedidos (usuario_id, total_centimos) VALUES (?, ?)"
-);
-
-const insertarDetalle = baseDeDatos.prepare(`
-    INSERT INTO detalle_pedido (pedido_id, producto_id, nombre, talla, cantidad, precio_centimos)
-    VALUES (?, ?, ?, ?, ?, ?)
-`);
 
 // Una "transacción" agrupa varias escrituras: o se guardan TODAS o no se guarda NINGUNA.
 // Así nunca queda un pedido a medias (por ejemplo, el pedido sin sus productos).
-const guardarPedido = baseDeDatos.transaction((usuarioId, lineas, totalCentimos) => {
-    const resultado = insertarPedido.run(usuarioId, totalCentimos);
-    const pedidoId = resultado.lastInsertRowid;   // el id que SQLite le asignó al pedido
+async function guardarPedido(usuarioId, lineas, totalCentimos) {
+    const transaccion = await baseDeDatos.transaction("write");
 
-    for (const linea of lineas) {
-        insertarDetalle.run(
-            pedidoId,
-            linea.productoId,
-            linea.nombre,
-            linea.talla,
-            linea.cantidad,
-            linea.precioCentimos
-        );
+    try {
+        const resultado = await transaccion.execute({
+            sql: "INSERT INTO pedidos (usuario_id, total_centimos) VALUES (?, ?)",
+            args: [usuarioId, totalCentimos],
+        });
+        const pedidoId = Number(resultado.lastInsertRowid);   // el id que le asignó la base de datos
+
+        for (const linea of lineas) {
+            await transaccion.execute({
+                sql: `INSERT INTO detalle_pedido (pedido_id, producto_id, nombre, talla, cantidad, precio_centimos)
+                      VALUES (?, ?, ?, ?, ?, ?)`,
+                args: [pedidoId, linea.productoId, linea.nombre, linea.talla, linea.cantidad, linea.precioCentimos],
+            });
+        }
+
+        await transaccion.commit();   // confirma todo
+        return pedidoId;
+    } catch (error) {
+        await transaccion.rollback(); // algo falló: deshace todo
+        throw error;
+    } finally {
+        transaccion.close();
     }
-
-    return pedidoId;
-});
+}
 
 // ---- POST /api/pedidos ----
 // Ruta protegida (exigirSesion). La página envía SOLO lo que la persona eligió:
 //   { items: [ { id: "polo1", talla: "M", cantidad: 2 }, ... ] }
 // Los precios y el total los pone el servidor.
-aplicacion.post("/api/pedidos", exigirSesion, (peticion, respuesta) => {
+aplicacion.post("/api/pedidos", exigirSesion, async (peticion, respuesta) => {
     const itemsRecibidos = peticion.body.items;
 
     if (!Array.isArray(itemsRecibidos) || itemsRecibidos.length === 0) {
@@ -326,7 +383,7 @@ aplicacion.post("/api/pedidos", exigirSesion, (peticion, respuesta) => {
     }
 
     try {
-        const pedidoId = guardarPedido(peticion.usuario.id, lineas, totalCentimos);
+        const pedidoId = await guardarPedido(peticion.usuario.id, lineas, totalCentimos);
 
         // Respondemos con los datos del servidor (en soles) para armar el mensaje de WhatsApp
         return respuesta.status(201).json({
@@ -344,38 +401,17 @@ aplicacion.post("/api/pedidos", exigirSesion, (peticion, respuesta) => {
         });
     } catch (error) {
         console.error("Error al guardar el pedido:", error);
-        return respuesta.status(500).json({ mensaje: "Ocurrió un error en el servidor 😿" });
+        return respuesta.status(500).json({ mensaje: MENSAJE_ERROR_SERVIDOR });
     }
 });
 
 // ============================================
-// 🆕 MI CUENTA: datos, contraseña e historial de pedidos
+// MI CUENTA: datos, contraseña e historial de pedidos
 // ============================================
-
-const actualizarDatosUsuario = baseDeDatos.prepare(
-    "UPDATE usuarios SET nombre = ?, apellidos = ?, celular = ? WHERE id = ?"
-);
-const buscarClaveHash = baseDeDatos.prepare("SELECT clave_hash FROM usuarios WHERE id = ?");
-const actualizarClaveHash = baseDeDatos.prepare("UPDATE usuarios SET clave_hash = ? WHERE id = ?");
-
-// Los últimos 50 pedidos de UNA persona (la más reciente primero)
-const listarPedidosDeUsuario = baseDeDatos.prepare(`
-    SELECT id, total_centimos, estado, fecha_pedido
-    FROM pedidos
-    WHERE usuario_id = ?
-    ORDER BY id DESC
-    LIMIT 50
-`);
-const listarDetalleDePedido = baseDeDatos.prepare(`
-    SELECT nombre, talla, cantidad, precio_centimos
-    FROM detalle_pedido
-    WHERE pedido_id = ?
-    ORDER BY id
-`);
 
 // ---- PUT /api/perfil ----  (cambiar nombres, apellidos y celular)
 // El correo NO se puede cambiar porque es lo que identifica la cuenta.
-aplicacion.put("/api/perfil", exigirSesion, (peticion, respuesta) => {
+aplicacion.put("/api/perfil", exigirSesion, async (peticion, respuesta) => {
     const nombre = limpiarTexto(peticion.body.nombre);
     const apellidos = limpiarTexto(peticion.body.apellidos);
     const celular = normalizarCelular(peticion.body.celular);
@@ -386,7 +422,10 @@ aplicacion.put("/api/perfil", exigirSesion, (peticion, respuesta) => {
     }
 
     try {
-        actualizarDatosUsuario.run(nombre, apellidos, celular, peticion.usuario.id);
+        await ejecutar(
+            "UPDATE usuarios SET nombre = ?, apellidos = ?, celular = ? WHERE id = ?",
+            [nombre, apellidos, celular, peticion.usuario.id]
+        );
 
         return respuesta.json({
             mensaje: "Datos actualizados ✅",
@@ -394,7 +433,7 @@ aplicacion.put("/api/perfil", exigirSesion, (peticion, respuesta) => {
         });
     } catch (error) {
         console.error("Error al actualizar los datos:", error);
-        return respuesta.status(500).json({ mensaje: "Ocurrió un error en el servidor 😿" });
+        return respuesta.status(500).json({ mensaje: MENSAJE_ERROR_SERVIDOR });
     }
 });
 
@@ -412,7 +451,7 @@ aplicacion.put("/api/clave", exigirSesion, async (peticion, respuesta) => {
 
     try {
         // Primero comprobamos que sabe su contraseña actual
-        const fila = buscarClaveHash.get(peticion.usuario.id);
+        const fila = await consultarUno("SELECT clave_hash FROM usuarios WHERE id = ?", [peticion.usuario.id]);
         const claveActualCorrecta = await bcrypt.compare(claveActual, fila.clave_hash);
 
         if (!claveActualCorrecta) {
@@ -420,35 +459,92 @@ aplicacion.put("/api/clave", exigirSesion, async (peticion, respuesta) => {
         }
 
         const nuevoHash = await bcrypt.hash(claveNueva, COSTO_BCRYPT);
-        actualizarClaveHash.run(nuevoHash, peticion.usuario.id);
+        await ejecutar("UPDATE usuarios SET clave_hash = ? WHERE id = ?", [nuevoHash, peticion.usuario.id]);
 
         return respuesta.json({ mensaje: "Contraseña actualizada ✅" });
     } catch (error) {
         console.error("Error al cambiar la contraseña:", error);
-        return respuesta.status(500).json({ mensaje: "Ocurrió un error en el servidor 😿" });
+        return respuesta.status(500).json({ mensaje: MENSAJE_ERROR_SERVIDOR });
     }
 });
 
 // ---- GET /api/mis-pedidos ----  (historial de la persona con sesión iniciada)
 // Solo devuelve los pedidos de ESA persona: el id sale del token, no de la página.
-aplicacion.get("/api/mis-pedidos", exigirSesion, (peticion, respuesta) => {
-    const pedidos = listarPedidosDeUsuario.all(peticion.usuario.id).map((pedido) => ({
-        id: pedido.id,
-        fecha: pedido.fecha_pedido,   // viene en hora UTC; la página la convierte a hora de Lima
-        estado: pedido.estado,
-        total: pedido.total_centimos / 100,
-        items: listarDetalleDePedido.all(pedido.id).map((item) => ({
-            nombre: item.nombre,
-            talla: item.talla,
-            cantidad: item.cantidad,
-            precio: item.precio_centimos / 100,
-            subtotal: (item.precio_centimos * item.cantidad) / 100,
-        })),
-    }));
+aplicacion.get("/api/mis-pedidos", exigirSesion, async (peticion, respuesta) => {
+    try {
+        // Consulta 1: los últimos 50 pedidos de la persona (el más reciente primero)
+        const pedidos = await consultarVarios(
+            `SELECT id, total_centimos, estado, fecha_pedido
+             FROM pedidos
+             WHERE usuario_id = ?
+             ORDER BY id DESC
+             LIMIT 50`,
+            [peticion.usuario.id]
+        );
 
-    respuesta.json({ pedidos });
+        // Consulta 2: los productos de TODOS esos pedidos de una sola vez
+        // (así hablamos solo 2 veces con la base de datos, no una vez por pedido)
+        const detalle = await consultarVarios(
+            `SELECT pedido_id, nombre, talla, cantidad, precio_centimos
+             FROM detalle_pedido
+             WHERE pedido_id IN (
+                 SELECT id FROM pedidos WHERE usuario_id = ? ORDER BY id DESC LIMIT 50
+             )
+             ORDER BY pedido_id DESC, id`,
+            [peticion.usuario.id]
+        );
+
+        // Agrupamos los productos por pedido
+        const productosPorPedido = new Map();
+        for (const fila of detalle) {
+            if (!productosPorPedido.has(fila.pedido_id)) productosPorPedido.set(fila.pedido_id, []);
+            productosPorPedido.get(fila.pedido_id).push({
+                nombre: fila.nombre,
+                talla: fila.talla,
+                cantidad: fila.cantidad,
+                precio: fila.precio_centimos / 100,
+                subtotal: (fila.precio_centimos * fila.cantidad) / 100,
+            });
+        }
+
+        return respuesta.json({
+            pedidos: pedidos.map((pedido) => ({
+                id: pedido.id,
+                fecha: pedido.fecha_pedido,   // viene en hora UTC; la página la convierte a hora de Lima
+                estado: pedido.estado,
+                total: pedido.total_centimos / 100,
+                items: productosPorPedido.get(pedido.id) || [],
+            })),
+        });
+    } catch (error) {
+        console.error("Error al listar los pedidos:", error);
+        return respuesta.status(500).json({ mensaje: MENSAJE_ERROR_SERVIDOR });
+    }
 });
 
-aplicacion.listen(PUERTO, () => {
-    console.log(`Servidor de Misha listo en http://localhost:${PUERTO}`);
+// ---- Manejo de errores generales ----
+// Si llega un JSON roto o demasiado grande, respondemos con un mensaje claro
+aplicacion.use((error, peticion, respuesta, siguiente) => {
+    if (error.type === "entity.parse.failed") {
+        return respuesta.status(400).json({ mensaje: "Los datos enviados no son válidos." });
+    }
+    if (error.type === "entity.too.large") {
+        return respuesta.status(413).json({ mensaje: "Los datos enviados son demasiado grandes." });
+    }
+
+    console.error("Error inesperado:", error);
+    return respuesta.status(500).json({ mensaje: MENSAJE_ERROR_SERVIDOR });
 });
+
+// ---- Arranque: primero preparamos la base de datos, luego abrimos el servidor ----
+iniciarBaseDeDatos()
+    .then(() => {
+        aplicacion.listen(PUERTO, () => {
+            console.log(`Servidor de Misha listo en el puerto ${PUERTO}`);
+            console.log(`Base de datos: ${usandoNube ? "Turso (nube)" : "archivo local misha.db"}`);
+        });
+    })
+    .catch((error) => {
+        console.error("No se pudo iniciar la base de datos:", error);
+        process.exit(1);
+    });

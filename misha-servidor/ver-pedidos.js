@@ -3,12 +3,12 @@
 // ============================================
 // Uso (en la terminal, dentro de misha-servidor):  node ver-pedidos.js
 
-const baseDeDatos = require("./db");
+const { consultarVarios, usandoNube } = require("./db");
 
-// JOIN = unir dos tablas: aquí juntamos cada pedido con los datos de quien lo hizo.
-// Dividimos entre 100.0 para mostrar soles en vez de céntimos.
-const pedidos = baseDeDatos
-    .prepare(`
+async function principal() {
+    // JOIN = unir dos tablas: aquí juntamos cada pedido con los datos de quien lo hizo.
+    // Dividimos entre 100.0 para mostrar soles en vez de céntimos.
+    const pedidos = await consultarVarios(`
         SELECT p.id,
                u.nombre,
                u.correo,
@@ -18,15 +18,14 @@ const pedidos = baseDeDatos
         FROM pedidos p
         JOIN usuarios u ON u.id = p.usuario_id
         ORDER BY p.id DESC
-    `)
-    .all();
+    `);
 
-console.log(`Total de pedidos: ${pedidos.length}`);
-console.table(pedidos);
+    console.log(`Base de datos: ${usandoNube ? "Turso (nube)" : "archivo local"}`);
+    console.log(`Total de pedidos: ${pedidos.length}`);
+    console.table(pedidos);
 
-// Los productos de cada pedido
-const detalle = baseDeDatos
-    .prepare(`
+    // Los productos de cada pedido
+    const detalle = await consultarVarios(`
         SELECT pedido_id,
                nombre AS producto,
                talla,
@@ -34,8 +33,10 @@ const detalle = baseDeDatos
                precio_centimos / 100.0 AS precio_soles
         FROM detalle_pedido
         ORDER BY pedido_id DESC, id
-    `)
-    .all();
+    `);
 
-console.log("Detalle de los pedidos:");
-console.table(detalle);
+    console.log("Detalle de los pedidos:");
+    console.table(detalle);
+}
+
+principal().catch((error) => console.error("Error:", error.message));

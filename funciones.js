@@ -31,11 +31,20 @@ function guardarAlmacen(clave, valor) {
 const avisoFlotante = document.getElementById("avisoFlotante");
 let temporizadorAviso = null;
 
-function mostrarAviso(texto) {
+// duracionMs: cuánto tiempo se queda visible. Con 0 se queda hasta que llamemos a ocultarAviso()
+function mostrarAviso(texto, duracionMs = 2200) {
     avisoFlotante.textContent = texto;
     avisoFlotante.classList.add("visible");
     clearTimeout(temporizadorAviso);
-    temporizadorAviso = setTimeout(() => avisoFlotante.classList.remove("visible"), 2200);
+
+    if (duracionMs > 0) {
+        temporizadorAviso = setTimeout(() => avisoFlotante.classList.remove("visible"), duracionMs);
+    }
+}
+
+function ocultarAviso() {
+    clearTimeout(temporizadorAviso);
+    avisoFlotante.classList.remove("visible");
 }
 
 // ============================================
@@ -176,9 +185,26 @@ carruselTrack.addEventListener("touchend", (evento) => {
 // SUSCRIPCIÓN POR CORREO (conectada al servidor Express)
 // ============================================
 
-// Dirección del servidor. Cuando lo publiques en la nube,
-// cambiarás solo esta línea por la URL pública.
-const URL_SERVIDOR = "http://localhost:3000";
+// ¿La página se está viendo desde tu computadora (Live Server) o desde internet (GitHub Pages)?
+const ES_LOCAL = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+
+// ✏️ Dirección del servidor: en tu computadora usa el servidor local; en internet, el de la nube.
+// Cuando crees el servicio en Render, pega aquí su dirección real (sin "/" al final).
+const URL_SERVIDOR = ES_LOCAL ? "http://localhost:3000" : "https://misha-servidor.onrender.com";
+
+// Los servidores gratuitos se duermen tras 15 minutos sin visitas y tardan hasta un minuto
+// en despertar. Esperamos hasta este tiempo antes de rendirnos con "No se pudo conectar".
+const TIEMPO_MAXIMO_ESPERA = ES_LOCAL ? 8000 : 70000;
+
+const MENSAJE_SIN_CONEXION = "No se pudo conectar con el servidor 😿";
+
+const esperar = (milisegundos) => new Promise((resolver) => setTimeout(resolver, milisegundos));
+
+// Al abrir la página "tocamos la puerta" del servidor sin avisar a nadie:
+// si estaba dormido, empieza a despertar mientras la persona mira la página.
+if (!ES_LOCAL) {
+    fetch(`${URL_SERVIDOR}/api/salud`).catch(() => {});
+}
 
 const formSuscripcion = document.getElementById("formSuscripcion");
 const inputCorreo = document.getElementById("inputCorreo");
@@ -213,25 +239,15 @@ formSuscripcion.addEventListener("submit", async (evento) => {
     botonSuscribirme.disabled = true;
     mostrarMensaje("Enviando...", "");
 
-    try {
-        const respuesta = await fetch(`${URL_SERVIDOR}/api/suscribirse`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ correo: correoIngresado }),
-        });
+    // pedirAlServidor espera si el servidor está dormido y SIEMPRE devuelve una respuesta
+    const resultado = await pedirAlServidor("/api/suscribirse", "POST", { correo: correoIngresado });
+    botonSuscribirme.disabled = false;
 
-        const datos = await respuesta.json();
-
-        if (respuesta.ok) {
-            mostrarMensaje(datos.mensaje, "exito");
-            formSuscripcion.reset();
-        } else {
-            mostrarMensaje(datos.mensaje, "error");
-        }
-    } catch (error) {
-        mostrarMensaje("No se pudo conectar con el servidor 😿", "error");
-    } finally {
-        botonSuscribirme.disabled = false;
+    if (resultado.ok) {
+        mostrarMensaje(resultado.datos.mensaje, "exito");
+        formSuscripcion.reset();
+    } else {
+        mostrarMensaje(resultado.datos.mensaje, "error");
     }
 });
 
@@ -629,6 +645,13 @@ async function enviarPedidoPorWhatsApp() {
     // en celulares) la bloquearían como ventana emergente. Más abajo le ponemos el enlace.
     const ventanaWhatsApp = window.open("", "_blank");
 
+    // Mientras esperamos al servidor, la pestaña nueva muestra un mensaje en vez de verse en blanco
+    if (ventanaWhatsApp) {
+        ventanaWhatsApp.document.write(
+            '<p style="font-family:sans-serif;text-align:center;margin-top:30vh">Preparando tu pedido… 🐾</p>'
+        );
+    }
+
     botonEnviarPedido.disabled = true;
     mensajeCarrito.textContent = "Guardando tu pedido...";
 
@@ -763,12 +786,70 @@ function validarDatosPersonales(nombres, apellidos, celular) {
     return null;
 }
 
+// ---- Despertar al servidor ----
+// Hora hasta la cual damos por despierto al servidor (no preguntamos de nuevo antes)
+let servidorDespiertoHasta = 0;
+
+// Pregunta a /api/salud hasta que el servidor responda. Si está dormido, avisa a la persona.
+// Devuelve true si el servidor está listo, o false si no respondió a tiempo.
+async function asegurarServidorDespierto() {
+    // Si hace poco comprobamos que estaba despierto, no volvemos a preguntar
+    if (Date.now() < servidorDespiertoHasta) return true;
+
+    const inicio = Date.now();
+    let avisoMostrado = false;
+
+    // Si tarda más de 3 segundos, avisamos para que la persona sepa que la página no se trabó
+    const temporizadorLento = setTimeout(() => {
+        avisoMostrado = true;
+        mostrarAviso("⏳ Despertando el servidor... puede tardar hasta un minuto.", 0);
+    }, 3000);
+
+    let despierto = false;
+
+    while (!despierto && Date.now() - inicio < TIEMPO_MAXIMO_ESPERA) {
+        try {
+            // Cada intento se corta a los 10 segundos para poder volver a intentar
+            const controlador = new AbortController();
+            const corte = setTimeout(() => controlador.abort(), 10000);
+            const respuesta = await fetch(`${URL_SERVIDOR}/api/salud`, { signal: controlador.signal });
+            clearTimeout(corte);
+            despierto = respuesta.ok;
+        } catch (error) {
+            despierto = false;   // el servidor aún no responde: probamos otra vez en un momento
+        }
+
+        if (!despierto) await esperar(2000);
+    }
+
+    clearTimeout(temporizadorLento);
+    if (avisoMostrado) ocultarAviso();
+
+    // Los servidores gratuitos se duermen a los 15 minutos: damos por despierto 10 minutos
+    if (despierto) servidorDespiertoHasta = Date.now() + 10 * 60 * 1000;
+
+    return despierto;
+}
+
 // Habla con el servidor y SIEMPRE devuelve { ok, estado, datos, sinConexion }
 //  - ok: true si el servidor respondió con éxito
 //  - estado: el código HTTP (200, 400, 401...), o 0 si no hubo conexión
 //  - datos: el JSON que respondió el servidor (ej: { mensaje: "..." })
 //  - sinConexion: true si no se pudo llegar al servidor (apagado o sin internet)
 async function pedirAlServidor(ruta, metodo, cuerpo, token) {
+    const sinConexion = {
+        ok: false,
+        estado: 0,
+        datos: { mensaje: MENSAJE_SIN_CONEXION },
+        sinConexion: true,
+    };
+
+    // 1) Primero nos aseguramos de que el servidor esté despierto (así la petición real
+    //    se envía UNA sola vez: nunca se duplica un pedido por reintentar)
+    if (!(await asegurarServidorDespierto())) {
+        return sinConexion;
+    }
+
     const encabezados = { "Content-Type": "application/json" };
 
     // Si hay token, lo enviamos para que el servidor sepa quiénes somos
@@ -776,22 +857,25 @@ async function pedirAlServidor(ruta, metodo, cuerpo, token) {
         encabezados["Authorization"] = `Bearer ${token}`;
     }
 
+    // 2) Hacemos la petición real, con un límite de 20 segundos
+    const controlador = new AbortController();
+    const corte = setTimeout(() => controlador.abort(), 20000);
+
     try {
         const respuesta = await fetch(`${URL_SERVIDOR}${ruta}`, {
             method: metodo,
             headers: encabezados,
             body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+            signal: controlador.signal,
         });
 
         const datos = await respuesta.json();
         return { ok: respuesta.ok, estado: respuesta.status, datos: datos, sinConexion: false };
     } catch (error) {
-        return {
-            ok: false,
-            estado: 0,
-            datos: { mensaje: "No se pudo conectar con el servidor 😿" },
-            sinConexion: true,
-        };
+        servidorDespiertoHasta = 0;   // algo falló: la próxima vez volvemos a comprobar
+        return sinConexion;
+    } finally {
+        clearTimeout(corte);
     }
 }
 
