@@ -1333,6 +1333,19 @@ button:hover {
     margin: 8px 0;
 }
 
+/* ===== AVISO "DESPERTANDO EL SERVIDOR" DENTRO DE UNA VENTANA ===== */
+
+.aviso-servidor {
+    margin: 0 0 12px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background-color: var(--crema);
+    color: var(--chocolate);
+    font-weight: 700;
+    font-size: 0.92rem;
+    text-align: center;
+}
+
 /* ===== AVISO FLOTANTE ===== */
 
 .aviso-flotante {

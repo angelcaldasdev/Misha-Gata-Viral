@@ -190,7 +190,7 @@ const ES_LOCAL = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
 // ✏️ Dirección del servidor: en tu computadora usa el servidor local; en internet, el de la nube.
 // Cuando crees el servicio en Render, pega aquí su dirección real (sin "/" al final).
-const URL_SERVIDOR = ES_LOCAL ? "http://localhost:3000" : "https://misha-servidor.onrender.com";
+const URL_SERVIDOR = ES_LOCAL ? "http://localhost:3000" : "https://misha-gata-viral.onrender.com";
 
 // Los servidores gratuitos se duermen tras 15 minutos sin visitas y tardan hasta un minuto
 // en despertar. Esperamos hasta este tiempo antes de rendirnos con "No se pudo conectar".
@@ -797,12 +797,11 @@ async function asegurarServidorDespierto() {
     if (Date.now() < servidorDespiertoHasta) return true;
 
     const inicio = Date.now();
-    let avisoMostrado = false;
+    let ocultarAvisoLento = null;
 
     // Si tarda más de 3 segundos, avisamos para que la persona sepa que la página no se trabó
     const temporizadorLento = setTimeout(() => {
-        avisoMostrado = true;
-        mostrarAviso("⏳ Despertando el servidor... puede tardar hasta un minuto.", 0);
+        ocultarAvisoLento = mostrarAvisoDespertando();
     }, 3000);
 
     let despierto = false;
@@ -823,12 +822,37 @@ async function asegurarServidorDespierto() {
     }
 
     clearTimeout(temporizadorLento);
-    if (avisoMostrado) ocultarAviso();
+    if (ocultarAvisoLento) ocultarAvisoLento();
 
     // Los servidores gratuitos se duermen a los 15 minutos: damos por despierto 10 minutos
-    if (despierto) servidorDespiertoHasta = Date.now() + 10 * 60 * 1000;
+    if (despierto) {
+        servidorDespiertoHasta = Date.now() + 10 * 60 * 1000;
+    } else {
+        // Pista para ti: abre la consola del navegador (F12) y mira a qué dirección intentó llegar
+        console.warn(`No se pudo conectar con el servidor: ${URL_SERVIDOR}`);
+    }
 
     return despierto;
+}
+
+// Muestra "Despertando el servidor..." donde la persona SÍ lo vea.
+// Una ventana abierta (<dialog>) tapa todo lo demás, incluido el aviso flotante de abajo,
+// así que en ese caso ponemos el mensaje DENTRO de la ventana.
+// Devuelve una función que quita el aviso.
+function mostrarAvisoDespertando() {
+    const texto = "⏳ Despertando el servidor... puede tardar hasta un minuto.";
+    const ventana = document.querySelector("dialog[open]");
+
+    if (!ventana) {
+        mostrarAviso(texto, 0);
+        return ocultarAviso;
+    }
+
+    const aviso = crearElemento("p", "aviso-servidor", texto);
+    aviso.setAttribute("role", "status");
+    ventana.prepend(aviso);
+
+    return () => aviso.remove();
 }
 
 // Habla con el servidor y SIEMPRE devuelve { ok, estado, datos, sinConexion }
